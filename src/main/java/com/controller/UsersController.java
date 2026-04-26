@@ -2,6 +2,8 @@
 package com.controller;
 
 
+import org.apache.commons.lang3.StringUtils;
+
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
@@ -51,7 +53,24 @@ public class UsersController{
 	 */
 	@IgnoreAuth
 	@RequestMapping(value = "/login")
-	public R login(String username, String password, String captcha, HttpServletRequest request) {
+	public R login(
+			@RequestParam(value = "username", required = false) String username,
+			@RequestParam(value = "password", required = false) String password,
+			@RequestParam(value = "captcha", required = false) String captcha,
+			@RequestBody(required = false) Map<String, Object> body,
+			HttpServletRequest request) {
+		if (body != null) {
+			if (StringUtils.isBlank(username) && body.get("username") != null) {
+				username = String.valueOf(body.get("username"));
+			}
+			if (StringUtils.isBlank(password) && body.containsKey("password")) {
+				Object p = body.get("password");
+				password = p != null ? String.valueOf(p) : null;
+			}
+			if (StringUtils.isBlank(captcha) && body.get("captcha") != null) {
+				captcha = String.valueOf(body.get("captcha"));
+			}
+		}
 		UsersEntity user = userService.selectOne(new EntityWrapper<UsersEntity>().eq("username", username));
 		if (user == null) {
 			return R.error("账号或密码不正确");
