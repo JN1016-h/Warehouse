@@ -43,8 +43,14 @@ import com.utils.MPUtil;
 import com.utils.MapUtils;
 import com.utils.CommonUtil;
 import com.utils.EncryptUtil;
+import com.dto.LoginRequest;
 import com.dto.UserDTO;
 import com.enums.UserRole;
+import com.utils.LoginRequestUtil;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 
 /**
@@ -57,6 +63,9 @@ import java.io.IOException;
 @RestController
 @RequestMapping("/yonghu")
 public class YonghuController {
+
+	private static final Logger log = LoggerFactory.getLogger(YonghuController.class);
+
     @Autowired
     private YonghuService yonghuService;
 
@@ -81,22 +90,19 @@ public class YonghuController {
 			@RequestParam(value = "username", required = false) String username,
 			@RequestParam(value = "password", required = false) String password,
 			@RequestParam(value = "captcha", required = false) String captcha,
-			@RequestBody(required = false) Map<String, Object> body,
+			@RequestBody(required = false) LoginRequest body,
 			HttpServletRequest request) {
-		if (body != null) {
-			if (StringUtils.isBlank(username) && body.get("username") != null) {
-				username = String.valueOf(body.get("username"));
-			}
-			if (StringUtils.isBlank(password) && body.containsKey("password")) {
-				Object p = body.get("password");
-				password = p != null ? String.valueOf(p) : null;
-			}
-			if (StringUtils.isBlank(captcha) && body.get("captcha") != null) {
-				captcha = String.valueOf(body.get("captcha"));
-			}
+		String[] c = LoginRequestUtil.merge(username, password, captcha, body);
+		username = c[0];
+		password = c[1];
+		// captcha c[2] 预留
+		if (StringUtils.isBlank(username) || StringUtils.isBlank(password)) {
+			log.warn("Yonghu login: blank username or password");
+			return R.error("账号或密码不正确");
 		}
 		YonghuEntity u = yonghuService.selectOne(new EntityWrapper<YonghuEntity>().eq("yonghuzhanghao", username));
 		if (u == null) {
+			log.warn("Yonghu login: account not found, username='{}'", username);
 			return R.error("账号或密码不正确");
 		}
 
@@ -110,6 +116,7 @@ public class YonghuController {
 			yonghuService.updateById(u);
 		}
 		if (!ok) {
+			log.warn("Yonghu login: password mismatch, username='{}'", username);
 			return R.error("账号或密码不正确");
 		}
 		
@@ -126,6 +133,14 @@ public class YonghuController {
     @RequestMapping("/register")
     public R register(@RequestBody YonghuEntity yonghu){
     	//ValidatorUtils.validateEntity(yonghu);
+		if (yonghu == null || StringUtils.isBlank(yonghu.getYonghuzhanghao()) || StringUtils.isBlank(yonghu.getMima())) {
+			log.warn("Yonghu register: missing yonghuzhanghao or mima");
+			return R.error("账号和密码不能为空");
+		}
+		yonghu.setYonghuzhanghao(yonghu.getYonghuzhanghao().trim());
+		if (yonghu.getYonghuxingming() != null) {
+			yonghu.setYonghuxingming(yonghu.getYonghuxingming().trim());
+		}
     	YonghuEntity u = yonghuService.selectOne(new EntityWrapper<YonghuEntity>().eq("yonghuzhanghao", yonghu.getYonghuzhanghao()));
 		if(u!=null) {
 			return R.error("注册用户已存在");
@@ -133,7 +148,12 @@ public class YonghuController {
 		Long uId = new Date().getTime();
 		yonghu.setId(uId);
 		yonghu.setMima(EncryptUtil.md5(yonghu.getMima()));
-        yonghuService.insert(yonghu);
+		try {
+			yonghuService.insert(yonghu);
+		} catch (Exception e) {
+			log.error("Yonghu register insert failed, username='{}'", yonghu.getYonghuzhanghao(), e);
+			return R.error("注册失败，请稍后重试或联系管理员");
+		}
         return R.ok();
     }
 

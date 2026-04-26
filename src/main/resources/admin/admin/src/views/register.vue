@@ -81,15 +81,20 @@ export default {
 	},
 	mounted(){
 		this.pageFlag = this.$route.query.pageFlag
-		if(this.$route.query.pageFlag=='register'){
-			
-			let table = this.$storage.get("loginTable");
-			this.tableName = table;
+		// 进入注册页即初始化；无 loginTable 时默认 yonghu，避免请求发到 /register 等错误路径
+		if (this.$route.name === 'register' || (this.$route.path && this.$route.path.indexOf('register') >= 0) || this.$route.query.pageFlag === 'register') {
+			let table = this.$storage.get("loginTable")
+			if (!table) {
+				table = 'yonghu'
+				this.$storage.set("loginTable", "yonghu")
+			}
+			this.tableName = table
 			if(this.tableName=='yonghu'){
 				this.ruleForm = {
 					zhanghao: '',
 					xingming: '',
 					mima: '',
+					mima2: '',
 					xingbie: '',
 					lianxidianhua: '',
 					touxiang: '',
@@ -135,7 +140,11 @@ export default {
 
 		// 注册
 		login() {
-			var url=this.tableName+"/register";
+			var tname = this.tableName || this.$storage.get("loginTable") || "yonghu"
+			if (!this.tableName) {
+				this.tableName = tname
+			}
+			var url = tname + "/register"
 			if((!this.ruleForm.zhanghao) && `yonghu` == this.tableName){
 				this.$message.error(`账号不能为空`);
 				return
@@ -146,6 +155,10 @@ export default {
 			}
 			if((!this.ruleForm.mima) && `yonghu` == this.tableName){
 				this.$message.error(`密码不能为空`);
+				return
+			}
+			if((!this.ruleForm.mima2) && `yonghu` == this.tableName){
+				this.$message.error(`请再次输入确认密码`);
 				return
 			}
 			if((this.ruleForm.mima!=this.ruleForm.mima2) && `yonghu` == this.tableName){
@@ -192,8 +205,13 @@ export default {
 						}
 					});
 				} else {
-					this.$message.error(data.msg);
+					this.$message.error((data && data.msg) ? data.msg : "注册失败");
 				}
+			}).catch((err) => {
+				const msg = (err && err.response && err.response.data && (err.response.data.message || err.response.data.msg))
+					? (err.response.data.message || err.response.data.msg)
+					: (err && err.message) ? err.message : "网络异常，注册请求失败"
+				this.$message.error(msg);
 			});
 		}
 	}

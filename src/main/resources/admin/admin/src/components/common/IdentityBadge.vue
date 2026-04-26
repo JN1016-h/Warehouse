@@ -28,19 +28,24 @@ export default {
      * 需求: 2.4, 2.5, 2.6, 2.7
      */
     roleDisplayName() {
-      // 如果是管理员表登录，显示系统管理员
+      // 与 IndexHeader 写入的 Vuex 一致，优先用已解析好的中文名
+      const fromStore = this.$store.getters['user/roleDisplayName']
+      if (fromStore) {
+        return fromStore
+      }
       const sessionTable = this.$storage.get('sessionTable');
       if (sessionTable === 'users') {
         return '系统管理员';
       }
-      
       const roleMap = {
         'DEALER': '经销商',
         'INTERNAL_STAFF': '内部员工',
         'PLATFORM_ADMIN': '平台管理员',
-        'WAREHOUSE_ADMIN': '仓库管理员'
+        'WAREHOUSE_ADMIN': '仓库管理员',
+        '管理员': '系统管理员',
       };
-      return roleMap[this.userRole] || this.$store.getters['user/roleDisplayName'] || '未知角色';
+      // yonghu 未配置 user_role 时，用登录时选择的「用户/管理员」
+      return roleMap[this.userRole] || this.$storage.get('role') || '用户';
     },
     /**
      * 根据角色返回Element UI Tag的type（颜色）

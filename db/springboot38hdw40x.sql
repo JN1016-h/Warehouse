@@ -195,21 +195,23 @@ CREATE TABLE `chukuxinxi`  (
   `xingming` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '出库人',
   `jiaohuoshijian` date NULL DEFAULT NULL COMMENT '交货时间',
   `kehumingcheng` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '客户名称',
+  `payment_status` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT 'UNPAID' COMMENT '付款状态：PAID-已付款, UNPAID-未付款',
+  `payment_time` datetime NULL DEFAULT NULL COMMENT '付款时间',
   PRIMARY KEY (`id`) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 10 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '出库信息' ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of chukuxinxi
 -- ----------------------------
-INSERT INTO `chukuxinxi` VALUES (1, '2025-01-02 14:58:49', '服装编号1', '服装名称1', '供应商名称1', '商品分类1', '联系电话1', 'upload/chukuxinxi_fuzhuangtupian1.jpg,upload/chukuxinxi_fuzhuangtupian2.jpg,upload/chukuxinxi_fuzhuangtupian3.jpg', '颜色1', '尺寸1', 1, '出库账号1', '出库人1', '2025-01-02', '客户名称1');
-INSERT INTO `chukuxinxi` VALUES (2, '2025-01-02 14:58:49', '服装编号2', '服装名称2', '供应商名称2', '商品分类2', '联系电话2', 'upload/chukuxinxi_fuzhuangtupian2.jpg,upload/chukuxinxi_fuzhuangtupian3.jpg,upload/chukuxinxi_fuzhuangtupian4.jpg', '颜色2', '尺寸2', 2, '出库账号2', '出库人2', '2025-01-02', '客户名称2');
-INSERT INTO `chukuxinxi` VALUES (3, '2025-01-02 14:58:49', '服装编号3', '服装名称3', '供应商名称3', '商品分类3', '联系电话3', 'upload/chukuxinxi_fuzhuangtupian3.jpg,upload/chukuxinxi_fuzhuangtupian4.jpg,upload/chukuxinxi_fuzhuangtupian5.jpg', '颜色3', '尺寸3', 3, '出库账号3', '出库人3', '2025-01-02', '客户名称3');
-INSERT INTO `chukuxinxi` VALUES (4, '2025-01-02 14:58:49', '服装编号4', '服装名称4', '供应商名称4', '商品分类4', '联系电话4', 'upload/chukuxinxi_fuzhuangtupian4.jpg,upload/chukuxinxi_fuzhuangtupian5.jpg,upload/chukuxinxi_fuzhuangtupian6.jpg', '颜色4', '尺寸4', 4, '出库账号4', '出库人4', '2025-01-02', '客户名称4');
-INSERT INTO `chukuxinxi` VALUES (5, '2025-01-02 14:58:49', '服装编号5', '服装名称5', '供应商名称5', '商品分类5', '联系电话5', 'upload/chukuxinxi_fuzhuangtupian5.jpg,upload/chukuxinxi_fuzhuangtupian6.jpg,upload/chukuxinxi_fuzhuangtupian7.jpg', '颜色5', '尺寸5', 5, '出库账号5', '出库人5', '2025-01-02', '客户名称5');
-INSERT INTO `chukuxinxi` VALUES (6, '2025-01-02 14:58:49', '服装编号6', '服装名称6', '供应商名称6', '商品分类6', '联系电话6', 'upload/chukuxinxi_fuzhuangtupian6.jpg,upload/chukuxinxi_fuzhuangtupian7.jpg,upload/chukuxinxi_fuzhuangtupian8.jpg', '颜色6', '尺寸6', 6, '出库账号6', '出库人6', '2025-01-02', '客户名称6');
-INSERT INTO `chukuxinxi` VALUES (7, '2025-01-02 14:58:49', '服装编号7', '服装名称7', '供应商名称7', '商品分类7', '联系电话7', 'upload/chukuxinxi_fuzhuangtupian7.jpg,upload/chukuxinxi_fuzhuangtupian8.jpg,upload/chukuxinxi_fuzhuangtupian1.jpg', '颜色7', '尺寸7', 7, '出库账号7', '出库人7', '2025-01-02', '客户名称7');
-INSERT INTO `chukuxinxi` VALUES (8, '2025-01-02 14:58:49', '服装编号8', '服装名称8', '供应商名称8', '商品分类8', '联系电话8', 'upload/chukuxinxi_fuzhuangtupian8.jpg,upload/chukuxinxi_fuzhuangtupian1.jpg,upload/chukuxinxi_fuzhuangtupian2.jpg', '颜色8', '尺寸8', 8, '出库账号8', '出库人8', '2025-01-02', '客户名称8');
-INSERT INTO `chukuxinxi` VALUES (9, '2025-01-02 15:03:47', '2365', '改良汉服', '万达', '汉服', '13613945847', 'upload/1735801402261.jpg', '蓝色', '均码', 65, '账号1', '李月', '2025-01-02', '李月');
+INSERT INTO `chukuxinxi` VALUES (1, '2025-01-02 14:58:49', '服装编号1', '服装名称1', '供应商名称1', '商品分类1', '联系电话1', 'upload/chukuxinxi_fuzhuangtupian1.jpg,upload/chukuxinxi_fuzhuangtupian2.jpg,upload/chukuxinxi_fuzhuangtupian3.jpg', '颜色1', '尺寸1', 1, '出库账号1', '出库人1', '2025-01-02', '客户名称1', 'UNPAID', NULL);
+INSERT INTO `chukuxinxi` VALUES (2, '2025-01-02 14:58:49', '服装编号2', '服装名称2', '供应商名称2', '商品分类2', '联系电话2', 'upload/chukuxinxi_fuzhuangtupian2.jpg,upload/chukuxinxi_fuzhuangtupian3.jpg,upload/chukuxinxi_fuzhuangtupian4.jpg', '颜色2', '尺寸2', 2, '出库账号2', '出库人2', '2025-01-02', '客户名称2', 'UNPAID', NULL);
+INSERT INTO `chukuxinxi` VALUES (3, '2025-01-02 14:58:49', '服装编号3', '服装名称3', '供应商名称3', '商品分类3', '联系电话3', 'upload/chukuxinxi_fuzhuangtupian3.jpg,upload/chukuxinxi_fuzhuangtupian4.jpg,upload/chukuxinxi_fuzhuangtupian5.jpg', '颜色3', '尺寸3', 3, '出库账号3', '出库人3', '2025-01-02', '客户名称3', 'UNPAID', NULL);
+INSERT INTO `chukuxinxi` VALUES (4, '2025-01-02 14:58:49', '服装编号4', '服装名称4', '供应商名称4', '商品分类4', '联系电话4', 'upload/chukuxinxi_fuzhuangtupian4.jpg,upload/chukuxinxi_fuzhuangtupian5.jpg,upload/chukuxinxi_fuzhuangtupian6.jpg', '颜色4', '尺寸4', 4, '出库账号4', '出库人4', '2025-01-02', '客户名称4', 'UNPAID', NULL);
+INSERT INTO `chukuxinxi` VALUES (5, '2025-01-02 14:58:49', '服装编号5', '服装名称5', '供应商名称5', '商品分类5', '联系电话5', 'upload/chukuxinxi_fuzhuangtupian5.jpg,upload/chukuxinxi_fuzhuangtupian6.jpg,upload/chukuxinxi_fuzhuangtupian7.jpg', '颜色5', '尺寸5', 5, '出库账号5', '出库人5', '2025-01-02', '客户名称5', 'UNPAID', NULL);
+INSERT INTO `chukuxinxi` VALUES (6, '2025-01-02 14:58:49', '服装编号6', '服装名称6', '供应商名称6', '商品分类6', '联系电话6', 'upload/chukuxinxi_fuzhuangtupian6.jpg,upload/chukuxinxi_fuzhuangtupian7.jpg,upload/chukuxinxi_fuzhuangtupian8.jpg', '颜色6', '尺寸6', 6, '出库账号6', '出库人6', '2025-01-02', '客户名称6', 'UNPAID', NULL);
+INSERT INTO `chukuxinxi` VALUES (7, '2025-01-02 14:58:49', '服装编号7', '服装名称7', '供应商名称7', '商品分类7', '联系电话7', 'upload/chukuxinxi_fuzhuangtupian7.jpg,upload/chukuxinxi_fuzhuangtupian8.jpg,upload/chukuxinxi_fuzhuangtupian1.jpg', '颜色7', '尺寸7', 7, '出库账号7', '出库人7', '2025-01-02', '客户名称7', 'UNPAID', NULL);
+INSERT INTO `chukuxinxi` VALUES (8, '2025-01-02 14:58:49', '服装编号8', '服装名称8', '供应商名称8', '商品分类8', '联系电话8', 'upload/chukuxinxi_fuzhuangtupian8.jpg,upload/chukuxinxi_fuzhuangtupian1.jpg,upload/chukuxinxi_fuzhuangtupian2.jpg', '颜色8', '尺寸8', 8, '出库账号8', '出库人8', '2025-01-02', '客户名称8', 'UNPAID', NULL);
+INSERT INTO `chukuxinxi` VALUES (9, '2025-01-02 15:03:47', '2365', '改良汉服', '万达', '汉服', '13613945847', 'upload/1735801402261.jpg', '蓝色', '均码', 65, '账号1', '李月', '2025-01-02', '李月', 'UNPAID', NULL);
 
 -- ----------------------------
 -- Table structure for config
@@ -424,21 +426,23 @@ CREATE TABLE `rukuxinxi`  (
   `xingming` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '验收人',
   `rukushijian` date NULL DEFAULT NULL COMMENT '入库时间',
   `yanshoushuoming` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '验收说明',
+  `payment_status` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT 'UNPAID' COMMENT '付款状态：PAID-已付款, UNPAID-未付款',
+  `payment_time` datetime NULL DEFAULT NULL COMMENT '付款时间',
   PRIMARY KEY (`id`) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 10 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '入库信息' ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of rukuxinxi
 -- ----------------------------
-INSERT INTO `rukuxinxi` VALUES (1, '2025-01-02 14:58:49', '订货id1', '服装编号1', '服装名称1', '商品分类1', '供应商名称1', '供应商id1', '联系电话1', 'upload/rukuxinxi_fuzhuangtupian1.jpg,upload/rukuxinxi_fuzhuangtupian2.jpg,upload/rukuxinxi_fuzhuangtupian3.jpg', '颜色1', '尺寸1', 1, '验收账号1', '验收人1', '2025-01-02', '验收说明1');
-INSERT INTO `rukuxinxi` VALUES (2, '2025-01-02 14:58:49', '订货id2', '服装编号2', '服装名称2', '商品分类2', '供应商名称2', '供应商id2', '联系电话2', 'upload/rukuxinxi_fuzhuangtupian2.jpg,upload/rukuxinxi_fuzhuangtupian3.jpg,upload/rukuxinxi_fuzhuangtupian4.jpg', '颜色2', '尺寸2', 2, '验收账号2', '验收人2', '2025-01-02', '验收说明2');
-INSERT INTO `rukuxinxi` VALUES (3, '2025-01-02 14:58:49', '订货id3', '服装编号3', '服装名称3', '商品分类3', '供应商名称3', '供应商id3', '联系电话3', 'upload/rukuxinxi_fuzhuangtupian3.jpg,upload/rukuxinxi_fuzhuangtupian4.jpg,upload/rukuxinxi_fuzhuangtupian5.jpg', '颜色3', '尺寸3', 3, '验收账号3', '验收人3', '2025-01-02', '验收说明3');
-INSERT INTO `rukuxinxi` VALUES (4, '2025-01-02 14:58:49', '订货id4', '服装编号4', '服装名称4', '商品分类4', '供应商名称4', '供应商id4', '联系电话4', 'upload/rukuxinxi_fuzhuangtupian4.jpg,upload/rukuxinxi_fuzhuangtupian5.jpg,upload/rukuxinxi_fuzhuangtupian6.jpg', '颜色4', '尺寸4', 4, '验收账号4', '验收人4', '2025-01-02', '验收说明4');
-INSERT INTO `rukuxinxi` VALUES (5, '2025-01-02 14:58:49', '订货id5', '服装编号5', '服装名称5', '商品分类5', '供应商名称5', '供应商id5', '联系电话5', 'upload/rukuxinxi_fuzhuangtupian5.jpg,upload/rukuxinxi_fuzhuangtupian6.jpg,upload/rukuxinxi_fuzhuangtupian7.jpg', '颜色5', '尺寸5', 5, '验收账号5', '验收人5', '2025-01-02', '验收说明5');
-INSERT INTO `rukuxinxi` VALUES (6, '2025-01-02 14:58:49', '订货id6', '服装编号6', '服装名称6', '商品分类6', '供应商名称6', '供应商id6', '联系电话6', 'upload/rukuxinxi_fuzhuangtupian6.jpg,upload/rukuxinxi_fuzhuangtupian7.jpg,upload/rukuxinxi_fuzhuangtupian8.jpg', '颜色6', '尺寸6', 6, '验收账号6', '验收人6', '2025-01-02', '验收说明6');
-INSERT INTO `rukuxinxi` VALUES (7, '2025-01-02 14:58:49', '订货id7', '服装编号7', '服装名称7', '商品分类7', '供应商名称7', '供应商id7', '联系电话7', 'upload/rukuxinxi_fuzhuangtupian7.jpg,upload/rukuxinxi_fuzhuangtupian8.jpg,upload/rukuxinxi_fuzhuangtupian1.jpg', '颜色7', '尺寸7', 7, '验收账号7', '验收人7', '2025-01-02', '验收说明7');
-INSERT INTO `rukuxinxi` VALUES (8, '2025-01-02 14:58:49', '订货id8', '服装编号8', '服装名称8', '商品分类8', '供应商名称8', '供应商id8', '联系电话8', 'upload/rukuxinxi_fuzhuangtupian8.jpg,upload/rukuxinxi_fuzhuangtupian1.jpg,upload/rukuxinxi_fuzhuangtupian2.jpg', '颜色8', '尺寸8', 8, '验收账号8', '验收人8', '2025-01-02', '验收说明8');
-INSERT INTO `rukuxinxi` VALUES (9, '2025-01-02 15:03:59', '121', '2365', '改良汉服', '汉服', '万达', '123', '13613945847', 'upload/1735801402261.jpg', '蓝色', '均码', 101, '111', '李月', '2025-01-02', '1111');
+INSERT INTO `rukuxinxi` VALUES (1, '2025-01-02 14:58:49', '订货id1', '服装编号1', '服装名称1', '商品分类1', '供应商名称1', '供应商id1', '联系电话1', 'upload/rukuxinxi_fuzhuangtupian1.jpg,upload/rukuxinxi_fuzhuangtupian2.jpg,upload/rukuxinxi_fuzhuangtupian3.jpg', '颜色1', '尺寸1', 1, '验收账号1', '验收人1', '2025-01-02', '验收说明1', 'UNPAID', NULL);
+INSERT INTO `rukuxinxi` VALUES (2, '2025-01-02 14:58:49', '订货id2', '服装编号2', '服装名称2', '商品分类2', '供应商名称2', '供应商id2', '联系电话2', 'upload/rukuxinxi_fuzhuangtupian2.jpg,upload/rukuxinxi_fuzhuangtupian3.jpg,upload/rukuxinxi_fuzhuangtupian4.jpg', '颜色2', '尺寸2', 2, '验收账号2', '验收人2', '2025-01-02', '验收说明2', 'UNPAID', NULL);
+INSERT INTO `rukuxinxi` VALUES (3, '2025-01-02 14:58:49', '订货id3', '服装编号3', '服装名称3', '商品分类3', '供应商名称3', '供应商id3', '联系电话3', 'upload/rukuxinxi_fuzhuangtupian3.jpg,upload/rukuxinxi_fuzhuangtupian4.jpg,upload/rukuxinxi_fuzhuangtupian5.jpg', '颜色3', '尺寸3', 3, '验收账号3', '验收人3', '2025-01-02', '验收说明3', 'UNPAID', NULL);
+INSERT INTO `rukuxinxi` VALUES (4, '2025-01-02 14:58:49', '订货id4', '服装编号4', '服装名称4', '商品分类4', '供应商名称4', '供应商id4', '联系电话4', 'upload/rukuxinxi_fuzhuangtupian4.jpg,upload/rukuxinxi_fuzhuangtupian5.jpg,upload/rukuxinxi_fuzhuangtupian6.jpg', '颜色4', '尺寸4', 4, '验收账号4', '验收人4', '2025-01-02', '验收说明4', 'UNPAID', NULL);
+INSERT INTO `rukuxinxi` VALUES (5, '2025-01-02 14:58:49', '订货id5', '服装编号5', '服装名称5', '商品分类5', '供应商名称5', '供应商id5', '联系电话5', 'upload/rukuxinxi_fuzhuangtupian5.jpg,upload/rukuxinxi_fuzhuangtupian6.jpg,upload/rukuxinxi_fuzhuangtupian7.jpg', '颜色5', '尺寸5', 5, '验收账号5', '验收人5', '2025-01-02', '验收说明5', 'UNPAID', NULL);
+INSERT INTO `rukuxinxi` VALUES (6, '2025-01-02 14:58:49', '订货id6', '服装编号6', '服装名称6', '商品分类6', '供应商名称6', '供应商id6', '联系电话6', 'upload/rukuxinxi_fuzhuangtupian6.jpg,upload/rukuxinxi_fuzhuangtupian7.jpg,upload/rukuxinxi_fuzhuangtupian8.jpg', '颜色6', '尺寸6', 6, '验收账号6', '验收人6', '2025-01-02', '验收说明6', 'UNPAID', NULL);
+INSERT INTO `rukuxinxi` VALUES (7, '2025-01-02 14:58:49', '订货id7', '服装编号7', '服装名称7', '商品分类7', '供应商名称7', '供应商id7', '联系电话7', 'upload/rukuxinxi_fuzhuangtupian7.jpg,upload/rukuxinxi_fuzhuangtupian8.jpg,upload/rukuxinxi_fuzhuangtupian1.jpg', '颜色7', '尺寸7', 7, '验收账号7', '验收人7', '2025-01-02', '验收说明7', 'UNPAID', NULL);
+INSERT INTO `rukuxinxi` VALUES (8, '2025-01-02 14:58:49', '订货id8', '服装编号8', '服装名称8', '商品分类8', '供应商名称8', '供应商id8', '联系电话8', 'upload/rukuxinxi_fuzhuangtupian8.jpg,upload/rukuxinxi_fuzhuangtupian1.jpg,upload/rukuxinxi_fuzhuangtupian2.jpg', '颜色8', '尺寸8', 8, '验收账号8', '验收人8', '2025-01-02', '验收说明8', 'UNPAID', NULL);
+INSERT INTO `rukuxinxi` VALUES (9, '2025-01-02 15:03:59', '121', '2365', '改良汉服', '汉服', '万达', '123', '13613945847', 'upload/1735801402261.jpg', '蓝色', '均码', 101, '111', '李月', '2025-01-02', '1111', 'UNPAID', NULL);
 
 -- ----------------------------
 -- Table structure for shangpinfenlei

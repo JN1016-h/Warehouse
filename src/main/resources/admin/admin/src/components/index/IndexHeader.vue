@@ -6,7 +6,15 @@
 		<identity-badge class="identity-badge-box" />
 		<el-dropdown class="dropdown-box" @command="handleCommand" trigger="click">
 			<div class="el-dropdown-link">
-				<el-image v-if="user" :src="avatar?this.$base.url + avatar : require('@/assets/img/avator.png')" fit="cover"></el-image>
+				<el-image
+					v-if="user"
+					:src="displayAvatar"
+					fit="cover"
+				>
+					<div slot="error" class="image-slot" style="display:flex;align-items:center;justify-content:center;height:100%;">
+						<img :src="defaultAvatar" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:100%;" />
+					</div>
+				</el-image>
 				<span class="label">欢迎您，</span>
 				<span class="nickname">{{this.$storage.get('adminName')}}</span>
 				<span class="icon iconfont icon-xiala"></span>
@@ -45,6 +53,7 @@
 				dialogVisible: false,
 				ruleForm: {},
 				user: null,
+				defaultAvatar: require('@/assets/img/avator.png'),
 			};
 		},
 		created() {
@@ -52,6 +61,21 @@
 		computed: {
 			avatar(){
 				return this.$storage.get('headportrait')?this.$storage.get('headportrait'):''
+			},
+			/** 头像：相对路径拼 base；无效时用默认，避免 404 显示「加载失败」 */
+			displayAvatar() {
+				if (!this.avatar) {
+					return this.defaultAvatar
+				}
+				const a = String(this.avatar).trim()
+				if (!a || a === 'null' || a === 'undefined') {
+					return this.defaultAvatar
+				}
+				if (a.indexOf('http://') === 0 || a.indexOf('https://') === 0) {
+					return a
+				}
+				const base = (this.$base && this.$base.url) ? this.$base.url : ''
+				return base + a.replace(/^\//, '')
 			},
 		},
 		mounted() {
@@ -64,22 +88,30 @@
 			}) => {
 				if (data && data.code === 0) {
 					if(sessionTable == 'yonghu') {
-						this.$storage.set('headportrait',data.data.touxiang)
+						const t = data.data.touxiang
+						this.$storage.set('headportrait', t && String(t).trim() ? t : '')
 					}
 					if(sessionTable == 'users') {
-						this.$storage.set('headportrait',data.data.image)
+						// users 表无 image 字段时勿写入无效值
+						const im = data.data.image
+						this.$storage.set('headportrait', im && String(im).trim() ? im : '')
 					}
 					this.$storage.set('userForm',JSON.stringify(data.data))
 					this.user = data.data;
 					this.$storage.set('userid',data.data.id);
 					
-					// 更新Vuex store中的用户信息
+					// 更新Vuex store中的用户信息（Yonghu 使用 yonghuxingming / yonghuzhanghao）
+					const d = data.data
+					const displayName = sessionTable === 'yonghu'
+						? (d.yonghuxingming || d.yonghuzhanghao || this.$storage.get('adminName') || '用户')
+						: (d.username || d.xingming || '管理员')
+					const rawRole = d.userRole || d.role || ''
 					const userInfo = {
-						id: data.data.id,
-						username: data.data.yonghuming || data.data.username,
-						name: data.data.xingming || data.data.yonghuming || data.data.username || '系统管理员',
-						role: data.data.userRole || data.data.role || '',
-						roleDisplayName: this.getRoleDisplayName(data.data.userRole || data.data.role)
+						id: d.id,
+						username: d.yonghuzhanghao || d.username,
+						name: displayName,
+						role: rawRole,
+						roleDisplayName: this.getRoleDisplayName(rawRole, sessionTable)
 					};
 					this.$store.commit('user/SET_USER_INFO', userInfo);
 				} else {
@@ -89,18 +121,27 @@
 			});
 		},
 		methods: {
-			getRoleDisplayName(role) {
+			getRoleDisplayName(role, sessionTable) {
+				const st = sessionTable || this.$storage.get("sessionTable")
 				const roleMap = {
 					'DEALER': '经销商',
 					'INTERNAL_STAFF': '内部员工',
 					'PLATFORM_ADMIN': '平台管理员',
-					'WAREHOUSE_ADMIN': '仓库管理员'
-				};
-				// 如果是管理员表(users)登录，默认显示为系统管理员
-				if (this.$storage.get("sessionTable") === 'users') {
-					return '系统管理员';
+					'WAREHOUSE_ADMIN': '仓库管理员',
+					'管理员': '系统管理员',
 				}
-				return roleMap[role] || '未知角色';
+				// 后台 users 表：role 存中文「管理员」
+				if (st === 'users') {
+					if (role && roleMap[role]) {
+						return roleMap[role]
+					}
+					return '系统管理员'
+				}
+				// yonghu 未设 user_role 时，用登录时选择的「用户」等
+				if (st === 'yonghu' && (role == null || role === '')) {
+					return this.$storage.get('role') || '用户'
+				}
+				return roleMap[role] || role || this.$storage.get('role') || '用户'
 			},
 			handleCommand(name) {
 				if (name == 'logout') {

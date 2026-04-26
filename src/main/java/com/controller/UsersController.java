@@ -34,6 +34,12 @@ import com.utils.PageUtils;
 import com.utils.R;
 import com.utils.ValidatorUtils;
 import com.utils.EncryptUtil;
+import com.utils.LoginRequestUtil;
+
+import com.dto.LoginRequest;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 登录相关
@@ -41,6 +47,8 @@ import com.utils.EncryptUtil;
 @RequestMapping("users")
 @RestController
 public class UsersController{
+
+	private static final Logger log = LoggerFactory.getLogger(UsersController.class);
 	
 	@Autowired
 	private UsersService userService;
@@ -57,22 +65,18 @@ public class UsersController{
 			@RequestParam(value = "username", required = false) String username,
 			@RequestParam(value = "password", required = false) String password,
 			@RequestParam(value = "captcha", required = false) String captcha,
-			@RequestBody(required = false) Map<String, Object> body,
+			@RequestBody(required = false) LoginRequest body,
 			HttpServletRequest request) {
-		if (body != null) {
-			if (StringUtils.isBlank(username) && body.get("username") != null) {
-				username = String.valueOf(body.get("username"));
-			}
-			if (StringUtils.isBlank(password) && body.containsKey("password")) {
-				Object p = body.get("password");
-				password = p != null ? String.valueOf(p) : null;
-			}
-			if (StringUtils.isBlank(captcha) && body.get("captcha") != null) {
-				captcha = String.valueOf(body.get("captcha"));
-			}
+		String[] c = LoginRequestUtil.merge(username, password, captcha, body);
+		username = c[0];
+		password = c[1];
+		if (StringUtils.isBlank(username) || StringUtils.isBlank(password)) {
+			log.warn("Users login: blank username or password");
+			return R.error("账号或密码不正确");
 		}
 		UsersEntity user = userService.selectOne(new EntityWrapper<UsersEntity>().eq("username", username));
 		if (user == null) {
+			log.warn("Users login: account not found, username='{}'", username);
 			return R.error("账号或密码不正确");
 		}
 		String stored = user.getPassword();
@@ -84,6 +88,7 @@ public class UsersController{
 			userService.updateById(user);
 		}
 		if(!ok) {
+			log.warn("Users login: password mismatch, username='{}'", username);
 			return R.error("账号或密码不正确");
 		}
 		String token = tokenService.generateToken(user.getId(),username, "users", user.getRole());
