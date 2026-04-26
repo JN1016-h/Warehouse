@@ -31,6 +31,7 @@ import com.utils.MPUtil;
 import com.utils.PageUtils;
 import com.utils.R;
 import com.utils.ValidatorUtils;
+import com.utils.EncryptUtil;
 
 /**
  * 登录相关
@@ -52,7 +53,18 @@ public class UsersController{
 	@RequestMapping(value = "/login")
 	public R login(String username, String password, String captcha, HttpServletRequest request) {
 		UsersEntity user = userService.selectOne(new EntityWrapper<UsersEntity>().eq("username", username));
-		if(user==null || !user.getPassword().equals(password)) {
+		if (user == null) {
+			return R.error("账号或密码不正确");
+		}
+		String stored = user.getPassword();
+		String inputMd5 = EncryptUtil.md5(password);
+		boolean ok = inputMd5 != null && inputMd5.equals(stored);
+		if (!ok && stored != null && stored.equals(password)) {
+			ok = true;
+			user.setPassword(inputMd5);
+			userService.updateById(user);
+		}
+		if(!ok) {
 			return R.error("账号或密码不正确");
 		}
 		String token = tokenService.generateToken(user.getId(),username, "users", user.getRole());
@@ -69,7 +81,10 @@ public class UsersController{
     	if(userService.selectOne(new EntityWrapper<UsersEntity>().eq("username", user.getUsername())) !=null) {
     		return R.error("用户已存在");
     	}
-        userService.insert(user);
+		if (user.getPassword() != null && !user.getPassword().isEmpty()) {
+			user.setPassword(EncryptUtil.md5(user.getPassword()));
+		}
+		userService.insert(user);
         return R.ok();
     }
 
@@ -92,7 +107,7 @@ public class UsersController{
     	if(user==null) {
     		return R.error("账号不存在");
     	}
-    	user.setPassword("123456");
+    	user.setPassword(EncryptUtil.md5("123456"));
         userService.update(user,null);
         return R.ok("密码已重置为：123456");
     }
@@ -145,7 +160,10 @@ public class UsersController{
     	if(userService.selectOne(new EntityWrapper<UsersEntity>().eq("username", user.getUsername())) !=null) {
     		return R.error("用户已存在");
     	}
-        userService.insert(user);
+		if (user.getPassword() != null && !user.getPassword().isEmpty()) {
+			user.setPassword(EncryptUtil.md5(user.getPassword()));
+		}
+		userService.insert(user);
         return R.ok();
     }
 

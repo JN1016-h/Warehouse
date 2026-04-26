@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: warehouse-ingress
+  namespace: warehouse
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /(/|$)(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: warehouse-frontend
+                port:
+                  number: 80
+          - path: /springboot38hdw40x(/|$)(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: warehouse-app
+                port:
+                  number: 8080

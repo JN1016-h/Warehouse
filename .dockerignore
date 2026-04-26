@@ -1,0 +1,10 @@
+target
+.idea
+.vscode
+.kiro
+.git
+.gitignore
+**/node_modules
+**/.cache
+**/*.log
+**/.DS_Store

@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: warehouse-app-config
+  namespace: warehouse
+data:
+  SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/springboot38hdw40x?useUnicode=true&characterEncoding=utf-8&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true"
+  SPRING_DATASOURCE_USERNAME: "root"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: warehouse-app-secret
+  namespace: warehouse
+type: Opaque
+stringData:
+  SPRING_DATASOURCE_PASSWORD: "123123"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: warehouse-app
+  namespace: warehouse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: warehouse-app
+  template:
+    metadata:
+      labels:
+        app: warehouse-app
+    spec:
+      containers:
+        - name: app
+          image: warehouse-app:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: warehouse-app-config
+            - secretRef:
+                name: warehouse-app-secret
+          env:
+            - name: JAVA_OPTS
+              value: "-Xms256m -Xmx512m"
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: warehouse-app
+  namespace: warehouse
+spec:
+  selector:
+    app: warehouse-app
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      nodePort: 30081
+  type: NodePort

@@ -42,6 +42,7 @@ import com.utils.R;
 import com.utils.MPUtil;
 import com.utils.MapUtils;
 import com.utils.CommonUtil;
+import com.utils.EncryptUtil;
 import com.dto.UserDTO;
 import com.enums.UserRole;
 import java.io.IOException;
@@ -78,7 +79,20 @@ public class YonghuController {
 	@RequestMapping(value = "/login")
 	public R login(String username, String password, String captcha, HttpServletRequest request) {
 		YonghuEntity u = yonghuService.selectOne(new EntityWrapper<YonghuEntity>().eq("yonghuzhanghao", username));
-		if(u==null || !u.getMima().equals(password)) {
+		if (u == null) {
+			return R.error("账号或密码不正确");
+		}
+
+		String stored = u.getMima();
+		String inputMd5 = EncryptUtil.md5(password);
+		boolean ok = inputMd5 != null && inputMd5.equals(stored);
+		// Backward compatible: some old rows may store plaintext password.
+		if (!ok && stored != null && stored.equals(password)) {
+			ok = true;
+			u.setMima(inputMd5);
+			yonghuService.updateById(u);
+		}
+		if (!ok) {
 			return R.error("账号或密码不正确");
 		}
 		
@@ -101,6 +115,7 @@ public class YonghuController {
 		}
 		Long uId = new Date().getTime();
 		yonghu.setId(uId);
+		yonghu.setMima(EncryptUtil.md5(yonghu.getMima()));
         yonghuService.insert(yonghu);
         return R.ok();
     }
@@ -135,7 +150,7 @@ public class YonghuController {
     	if(u==null) {
     		return R.error("账号不存在");
     	}
-        u.setMima("123456");
+        u.setMima(EncryptUtil.md5("123456"));
         yonghuService.updateById(u);
         return R.ok("密码已重置为：123456");
     }
@@ -238,6 +253,9 @@ public class YonghuController {
 			return R.error("用户已存在");
 		}
 		yonghu.setId(new Date().getTime());
+		if (StringUtils.isNotBlank(yonghu.getMima())) {
+			yonghu.setMima(EncryptUtil.md5(yonghu.getMima()));
+		}
         yonghuService.insert(yonghu);
         return R.ok();
     }
@@ -257,6 +275,9 @@ public class YonghuController {
 			return R.error("用户已存在");
 		}
 		yonghu.setId(new Date().getTime());
+		if (StringUtils.isNotBlank(yonghu.getMima())) {
+			yonghu.setMima(EncryptUtil.md5(yonghu.getMima()));
+		}
         yonghuService.insert(yonghu);
         return R.ok().put("data",yonghu.getId());
     }
