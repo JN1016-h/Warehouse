@@ -163,10 +163,24 @@ export default {
 				this.$message.error(`电子邮件应输入邮件格式`);
 				return
 			}
+			// Map frontend form fields to backend entity fields
+			let payload = this.ruleForm
+			if (this.tableName === 'yonghu') {
+				payload = {
+					yonghuzhanghao: this.ruleForm.zhanghao,
+					yonghuxingming: this.ruleForm.xingming,
+					mima: this.ruleForm.mima,
+					xingbie: this.ruleForm.xingbie,
+					lianxifangshi: this.ruleForm.lianxidianhua,
+					touxiang: this.ruleForm.touxiang,
+					dianziyoujian: this.ruleForm.dianziyoujian,
+				}
+			}
+
 			this.$http({
 				url: url,
 				method: "post",
-				data:this.ruleForm
+				data: payload
 			}).then(({ data }) => {
 				if (data && data.code === 0) {
 					this.$message({
