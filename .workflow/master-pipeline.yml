@@ -51,7 +51,6 @@ stages:
           artifactName: backend-jar
           dependsOn: build_maven
 
-        # 给 K8S 主机部署用的“源码包”（按 Jenkinsfile 思路在目标机 docker build + kubectl apply）
         - step: build@maven
           name: pack_deploy_bundle
           displayName: 打包 K8S 部署包（源码 + k8s + db）
@@ -218,11 +217,6 @@ stages:
             - ls -lah tests/jmeter/output || true
             - docker rm -f warehouse-app-ci || true
 
-  # K8S 发布部署（参考 jenkins/Jenkinsfile.backend）
-  # 说明：
-  # - 不依赖镜像仓库：在“目标主机”上 docker build 出镜像（通常这台主机就是集群节点或能访问集群的跳板机）
-  # - 需要你在 Gitee Go 里先建好“主机组”，并把 hostGroupID 填到变量 HOST_GROUP_ID
-  # - 目标主机需具备：docker、kubectl，并且 kubectl 已配置好集群访问（~/.kube/config 或环境变量）
   - stage:
       name: deploy
       displayName: deploy（K8S 发布部署）
@@ -266,17 +260,3 @@ stages:
 
             echo "== Rollout status =="
             kubectl -n "${NAMESPACE}" rollout status deploy/warehouse-app --timeout=180s
-
-  # 如需自动部署到 K8S：在 Gitee Go “凭证管理”里添加 K8S 集群证书，替换 certificate/namespace/yaml
-  # - stage:
-  #     name: deploy
-  #     displayName: 部署到 K8S
-  #     steps:
-  #       - step: deploy@k8s
-  #         name: deploy_k8s
-  #         displayName: K8S 部署
-  #         version: v1.16.4
-  #         certificate: ${K8S_CERTIFICATE}
-  #         namespace: warehouse
-  #         yaml: ./k8s/app.cicd.yaml
-  #         isReplace: false
