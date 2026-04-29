@@ -221,15 +221,16 @@ CREATE TABLE `config`  (
   `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键',
   `name` varchar(100) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL COMMENT '配置参数名称',
   `value` varchar(100) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL COMMENT '配置参数值',
+  `url` varchar(500) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL COMMENT '外链或展示用url',
   PRIMARY KEY (`id`) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 4 CHARACTER SET = utf8 COLLATE = utf8_general_ci COMMENT = '配置文件' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of config
 -- ----------------------------
-INSERT INTO `config` VALUES (1, 'picture1', 'upload/picture1.jpg');
-INSERT INTO `config` VALUES (2, 'picture2', 'upload/picture2.jpg');
-INSERT INTO `config` VALUES (3, 'picture3', 'upload/picture3.jpg');
+INSERT INTO `config` VALUES (1, 'picture1', 'upload/picture1.jpg', NULL);
+INSERT INTO `config` VALUES (2, 'picture2', 'upload/picture2.jpg', NULL);
+INSERT INTO `config` VALUES (3, 'picture3', 'upload/picture3.jpg', NULL);
 
 -- ----------------------------
 -- Table structure for dinghuoxinxi
