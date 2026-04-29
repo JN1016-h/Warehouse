@@ -1,0 +1,11 @@
+{
+  "name": "k8s-直连后端(NodePort)",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://47.103.133.105:30081/springboot38hdw40x",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}

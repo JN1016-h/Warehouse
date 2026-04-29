@@ -1,0 +1,35 @@
+{
+  "info": {
+    "name": "仓库管理系统-接口集合",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "与项目 context-path /springboot38hdw40x 一致；以下接口带 @IgnoreAuth，无需 Token 可用作冒烟/联调。"
+  },
+  "item": [
+    {
+      "name": "商品分类列表(前台)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/shangpinfenlei/list?page=1&limit=10"
+      }
+    },
+    {
+      "name": "系统配置列表(前台)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/config/list?page=1&limit=5"
+      }
+    },
+    {
+      "name": "用户登录(yonghu)-JSON",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"你的账号\",\n  \"password\": \"你的密码\"\n}"
+        },
+        "url": "{{baseUrl}}/yonghu/login"
+      }
+    }
+  ]
+}

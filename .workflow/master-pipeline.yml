@@ -1,0 +1,282 @@
+version: '1.0'
+name: master-pipeline
+displayName: MasterPipeline
+
+triggers:
+  push:
+    branches:
+      include:
+        - master
+
+stages:
+  - stage:
+      name: sast
+      displayName: SAST（静态扫描）
+      steps:
+        - step: build@maven
+          name: sast_semgrep
+          displayName: Semgrep SAST
+          jdkVersion: 8
+          mavenVersion: 3.6.3
+          commands:
+            - echo "=== Install semgrep ==="
+            - apt-get update
+            - apt-get install -y python3 python3-pip
+            - pip3 install --no-cache-dir semgrep
+            - echo "=== Run semgrep (best-effort) ==="
+            - semgrep --version
+            - semgrep --config p/java --error --timeout 300 .
+
+  - stage:
+      name: build
+      displayName: 构建（master）
+      steps:
+        - step: build@maven
+          name: build_maven
+          displayName: Maven 构建（JAR）
+          jdkVersion: 8
+          mavenVersion: 3.6.3
+          commands:
+            - echo "=== Maven build (skip tests) ==="
+            - mvn -B -ntp clean package -Dmaven.test.skip=true
+          artifacts:
+            - name: BUILD_ARTIFACT
+              path:
+                - ./target/*.jar
+
+        - step: publish@general_artifacts
+          name: publish_general_artifacts
+          displayName: 上传制品（master）
+          dependArtifact: BUILD_ARTIFACT
+          artifactName: backend-jar
+          dependsOn: build_maven
+
+        # 给 K8S 主机部署用的“源码包”（按 Jenkinsfile 思路在目标机 docker build + kubectl apply）
+        - step: build@maven
+          name: pack_deploy_bundle
+          displayName: 打包 K8S 部署包（源码 + k8s + db）
+          jdkVersion: 8
+          mavenVersion: 3.6.3
+          commands:
+            - echo "=== Prepare deploy bundle ==="
+            - rm -rf src/main/resources/admin/admin/node_modules || true
+            - mkdir -p deploy
+            - tar -czf deploy/deploy-package.tar.gz Dockerfile pom.xml src k8s db scripts tests
+            - ls -lah deploy || true
+          artifacts:
+            - name: DEPLOY_BUNDLE
+              path:
+                - ./deploy/deploy-package.tar.gz
+
+        - step: publish@general_artifacts
+          name: publish_deploy_bundle
+          displayName: 上传部署包（master）
+          dependArtifact: DEPLOY_BUNDLE
+          artifactName: deploy-bundle
+          dependsOn: pack_deploy_bundle
+
+  - stage:
+      name: unit
+      displayName: unit（单元测试）
+      steps:
+        - step: build@maven
+          name: unit_test
+          displayName: Maven test
+          jdkVersion: 8
+          mavenVersion: 3.6.3
+          commands:
+            - echo "=== Maven unit tests ==="
+            - mvn -B -ntp test -DskipTests=false -Dmaven.test.skip=false
+
+  - stage:
+      name: integration
+      displayName: integration（集成测试）
+      steps:
+        - step: build@maven
+          name: integration_smoke
+          displayName: Integration smoke (placeholder)
+          jdkVersion: 8
+          mavenVersion: 3.6.3
+          commands:
+            - echo "=== Integration smoke ==="
+            - echo "No dedicated IT yet; add tests under src/test or a dedicated IT profile when ready."
+
+  - stage:
+      name: image
+      displayName: 构建镜像（本地，不推送）
+      steps:
+        - step: build@maven
+          name: docker_build_local
+          displayName: Docker build (local)
+          jdkVersion: 8
+          mavenVersion: 3.6.3
+          commands:
+            - echo "=== Build docker image locally (no push) ==="
+            - docker --version
+            - IMAGE="warehouse-app:build.${GITEE_PIPELINE_BUILD_NUMBER}"
+            - echo "IMAGE=${IMAGE}"
+            - docker build -f ./Dockerfile -t "${IMAGE}" .
+            - docker image ls | head -n 20 || true
+
+  - stage:
+      name: container_iac_scan
+      displayName: container_iac_scan（镜像&配置扫描）
+      steps:
+        - step: build@maven
+          name: trivy_scan
+          displayName: Trivy scan (fs + image)
+          jdkVersion: 8
+          mavenVersion: 3.6.3
+          commands:
+            - echo "=== Install trivy ==="
+            - apt-get update
+            - apt-get install -y wget ca-certificates
+            - wget -q https://github.com/aquasecurity/trivy/releases/download/v0.53.0/trivy_0.53.0_Linux-64bit.deb -O /tmp/trivy.deb
+            - dpkg -i /tmp/trivy.deb || (apt-get -f install -y && dpkg -i /tmp/trivy.deb)
+            - trivy --version
+            - echo "=== Trivy filesystem (best-effort) ==="
+            - trivy fs --scanners vuln,config --exit-code 0 --timeout 10m .
+            - IMAGE="warehouse-app:build.${GITEE_PIPELINE_BUILD_NUMBER}"
+            - echo "=== Trivy image (best-effort): ${IMAGE} ==="
+            - trivy image --exit-code 0 --timeout 15m "${IMAGE}"
+
+  - stage:
+      name: dast
+      displayName: dast（动态扫描）
+      steps:
+        - step: build@maven
+          name: zap_baseline
+          displayName: OWASP ZAP baseline (best-effort)
+          jdkVersion: 8
+          mavenVersion: 3.6.3
+          commands:
+            - echo "=== Prepare docker ==="
+            - docker --version
+            - IMAGE="warehouse-app:build.${GITEE_PIPELINE_BUILD_NUMBER}"
+            - echo "=== Run app locally: ${IMAGE} ==="
+            - docker rm -f warehouse-app-ci || true
+            - docker run -d --name warehouse-app-ci --network host -e "JAVA_OPTS=-Xms256m -Xmx512m" "${IMAGE}"
+            - echo "=== Wait for app to be ready ==="
+            - for i in $(seq 1 60); do curl -fsS "http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=1" && break || true; sleep 2; done
+            - echo "=== Run ZAP baseline ==="
+            - docker run --rm --network host -v "$(pwd)":/zap/wrk owasp/zap2docker-stable zap-baseline.py -t "http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=1" -r zap-report.html || true
+            - ls -lah zap-report.html || true
+            - docker rm -f warehouse-app-ci || true
+
+  - stage:
+      name: performance
+      displayName: performance（性能测试）
+      steps:
+        - step: build@maven
+          name: perf_k6
+          displayName: k6 load test (quick)
+          jdkVersion: 8
+          mavenVersion: 3.6.3
+          commands:
+            - echo "=== Install k6 ==="
+            - apt-get update
+            - apt-get install -y ca-certificates curl tar
+            - curl -fsSL -o /tmp/k6.tgz https://github.com/grafana/k6/releases/download/v0.49.0/k6-v0.49.0-linux-amd64.tar.gz
+            - tar -C /tmp -xzf /tmp/k6.tgz
+            - install -m 0755 /tmp/k6-v0.49.0-linux-amd64/k6 /usr/local/bin/k6
+            - k6 version
+            - IMAGE="warehouse-app:build.${GITEE_PIPELINE_BUILD_NUMBER}"
+            - echo "=== Run app locally: ${IMAGE} ==="
+            - docker rm -f warehouse-app-ci || true
+            - docker run -d --name warehouse-app-ci --network host -e "JAVA_OPTS=-Xms256m -Xmx512m" "${IMAGE}"
+            - for i in $(seq 1 60); do curl -fsS "http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=1" && break || true; sleep 2; done
+            - echo "=== Run k6 script ==="
+            - k6 run -e BASE_URL="http://127.0.0.1:8080/springboot38hdw40x" tests/k6/smoke.js
+            - docker rm -f warehouse-app-ci || true
+
+        - step: build@maven
+          name: perf_jmeter
+          displayName: JMeter plan (non-GUI)
+          jdkVersion: 8
+          mavenVersion: 3.6.3
+          commands:
+            - echo "=== Install JMeter ==="
+            - apt-get update
+            - apt-get install -y ca-certificates curl tar unzip
+            - JMETER_VER=5.6.3
+            - curl -fsSL -o /tmp/jmeter.tgz "https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-${JMETER_VER}.tgz"
+            - tar -C /opt -xzf /tmp/jmeter.tgz
+            - export JMETER_HOME="/opt/apache-jmeter-${JMETER_VER}"
+            - export PATH="$JMETER_HOME/bin:$PATH"
+            - jmeter -v
+            - IMAGE="warehouse-app:build.${GITEE_PIPELINE_BUILD_NUMBER}"
+            - echo "=== Run app locally: ${IMAGE} ==="
+            - docker rm -f warehouse-app-ci || true
+            - docker run -d --name warehouse-app-ci --network host -e "JAVA_OPTS=-Xms256m -Xmx512m" "${IMAGE}"
+            - for i in $(seq 1 60); do curl -fsS "http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=1" && break || true; sleep 2; done
+            - echo "=== Run JMeter JMX (override host/port via sed copy) ==="
+            - mkdir -p tests/jmeter/output
+            - cp tests/jmeter/warehouse-load.jmx /tmp/warehouse-load.ci.jmx
+            - sed -i 's/<stringProp name="HTTPSampler.domain">47.103.133.105<\\/stringProp>/<stringProp name="HTTPSampler.domain">127.0.0.1<\\/stringProp>/g' /tmp/warehouse-load.ci.jmx
+            - sed -i 's/<stringProp name="HTTPSampler.port">30081<\\/stringProp>/<stringProp name="HTTPSampler.port">8080<\\/stringProp>/g' /tmp/warehouse-load.ci.jmx
+            - jmeter -n -t /tmp/warehouse-load.ci.jmx -l tests/jmeter/output/result.jtl -e -o tests/jmeter/output/html-report
+            - ls -lah tests/jmeter/output || true
+            - docker rm -f warehouse-app-ci || true
+
+  # K8S 发布部署（参考 jenkins/Jenkinsfile.backend）
+  # 说明：
+  # - 不依赖镜像仓库：在“目标主机”上 docker build 出镜像（通常这台主机就是集群节点或能访问集群的跳板机）
+  # - 需要你在 Gitee Go 里先建好“主机组”，并把 hostGroupID 填到变量 HOST_GROUP_ID
+  # - 目标主机需具备：docker、kubectl，并且 kubectl 已配置好集群访问（~/.kube/config 或环境变量）
+  - stage:
+      name: deploy
+      displayName: deploy（K8S 发布部署）
+      steps:
+        - step: deploy@agent
+          name: deploy_k8s_agent
+          displayName: 主机部署（docker build + kubectl apply）
+          hostGroupID: ${HOST_GROUP_ID}
+          deployArtifact:
+            - source: build
+              name: deploy-bundle
+              target: ~/gitee_go/deploy
+              dependArtifact: deploy-bundle
+          script: |
+            set -e
+            cd ~/gitee_go/deploy
+            rm -rf repo || true
+            mkdir -p repo
+            tar -xzf deploy-bundle.tar.gz -C repo
+            cd repo
+
+            NAMESPACE="${K8S_NAMESPACE:-warehouse}"
+            K8S_DIR="${K8S_DIR:-/home/k8s}"
+            IMAGE="warehouse-app:build.${GITEE_PIPELINE_BUILD_NUMBER}"
+
+            echo "== Build image on target host =="
+            docker build -t "${IMAGE}" -f ./Dockerfile .
+
+            echo "== Apply namespace (from ${K8S_DIR}) =="
+            kubectl apply -f "${K8S_DIR}/namespace.yaml"
+
+            echo "== Update app image in ${K8S_DIR}/app.yaml =="
+            sed -i "s|^\\([[:space:]]*image:[[:space:]]*\\)warehouse-app:.*$|\\1${IMAGE}|g" "${K8S_DIR}/app.yaml"
+
+            echo "== Ensure MySQL 8 allowPublicKeyRetrieval=true in ${K8S_DIR}/app.yaml =="
+            sed -i 's|\(jdbc:mysql://mysql:3306/springboot38hdw40x[^"]*\)|\1\&allowPublicKeyRetrieval=true|g' "${K8S_DIR}/app.yaml"
+            sed -i 's|allowPublicKeyRetrieval=true\&allowPublicKeyRetrieval=true|allowPublicKeyRetrieval=true|g' "${K8S_DIR}/app.yaml"
+
+            echo "== Apply app manifests (from ${K8S_DIR}) =="
+            kubectl apply -f "${K8S_DIR}/app.yaml"
+
+            echo "== Rollout status =="
+            kubectl -n "${NAMESPACE}" rollout status deploy/warehouse-app --timeout=180s
+
+  # 如需自动部署到 K8S：在 Gitee Go “凭证管理”里添加 K8S 集群证书，替换 certificate/namespace/yaml
+  # - stage:
+  #     name: deploy
+  #     displayName: 部署到 K8S
+  #     steps:
+  #       - step: deploy@k8s
+  #         name: deploy_k8s
+  #         displayName: K8S 部署
+  #         version: v1.16.4
+  #         certificate: ${K8S_CERTIFICATE}
+  #         namespace: warehouse
+  #         yaml: ./k8s/app.cicd.yaml
+  #         isReplace: false

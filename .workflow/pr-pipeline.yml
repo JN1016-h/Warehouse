@@ -1,0 +1,56 @@
+version: '1.0'
+name: pr-pipeline
+displayName: PRPipeline
+
+triggers:
+  pull_request:
+    branches:
+      include:
+        - master
+
+stages:
+  - stage:
+      name: sast
+      displayName: SAST（静态扫描）
+      steps:
+        - step: build@maven
+          name: sast_semgrep
+          displayName: Semgrep SAST
+          jdkVersion: 8
+          mavenVersion: 3.6.3
+          commands:
+            - echo "=== Install semgrep ==="
+            - apt-get update
+            - apt-get install -y python3 python3-pip
+            - pip3 install --no-cache-dir semgrep
+            - echo "=== Run semgrep (best-effort) ==="
+            - semgrep --version
+            - semgrep --config p/java --error --timeout 300 .
+
+  - stage:
+      name: build
+      displayName: 构建（PR 校验）
+      steps:
+        - step: build@maven
+          name: build_maven
+          displayName: Maven 构建（JAR）
+          jdkVersion: 8
+          mavenVersion: 3.6.3
+          commands:
+            - echo "=== Maven build (skip tests) ==="
+            - mvn -B -ntp clean package -Dmaven.test.skip=true
+            - echo "=== List target ==="
+            - ls -lah ./target || true
+
+  - stage:
+      name: unit
+      displayName: unit（单元测试）
+      steps:
+        - step: build@maven
+          name: unit_test
+          displayName: Maven test
+          jdkVersion: 8
+          mavenVersion: 3.6.3
+          commands:
+            - echo "=== Maven unit tests ==="
+            - mvn -B -ntp test -DskipTests=false -Dmaven.test.skip=false
