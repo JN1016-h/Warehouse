@@ -26,6 +26,7 @@ stages:
             - echo "=== Run semgrep (best-effort) ==="
             - semgrep --version
             - semgrep --config p/java --error --timeout 300 .
+            - semgrep --config p/javascript --error --timeout 300 .
 
   - stage:
       name: build
@@ -260,3 +261,91 @@ stages:
 
             echo "== Rollout status =="
             kubectl -n "${NAMESPACE}" rollout status deploy/warehouse-app --timeout=180s
+
+  - stage:
+      name: deploy_frontend
+      displayName: deploy_frontend（K8S 发布部署）
+      steps:
+        - step: deploy@agent
+          name: deploy_k8s_frontend_agent
+          displayName: 主机部署（frontend docker build + kubectl apply）
+          hostGroupID: ${HOST_GROUP_ID}
+          deployArtifact:
+            - source: build
+              name: deploy-bundle
+              target: ~/gitee_go/deploy
+              dependArtifact: deploy-bundle
+          script: |
+            set -e
+            cd ~/gitee_go/deploy
+            rm -rf repo-fe || true
+            mkdir -p repo-fe
+            tar -xzf deploy-bundle.tar.gz -C repo-fe
+            cd repo-fe
+
+            NAMESPACE="${K8S_NAMESPACE:-warehouse}"
+            K8S_DIR="${K8S_DIR:-/home/k8s}"
+            FE_IMAGE="warehouse-frontend:build.${GITEE_PIPELINE_BUILD_NUMBER}"
+
+            FE_DIR="./src/main/resources/admin/admin"
+
+            cat > "${FE_DIR}/Dockerfile.ci.frontend" <<'EOF'
+            ARG BASE_NODE_IMAGE=node:18-alpine
+            ARG BASE_NGINX_IMAGE=nginx:1.25-alpine
+
+            FROM ${BASE_NODE_IMAGE} AS build
+            WORKDIR /app
+
+            COPY package.json package-lock.json ./
+            RUN npm ci
+
+            COPY . .
+            RUN node ./node_modules/@vue/cli-service/bin/vue-cli-service.js build
+
+            FROM ${BASE_NGINX_IMAGE}
+            COPY nginx.conf /etc/nginx/conf.d/default.conf
+            COPY --from=build /app/dist /usr/share/nginx/html
+            EXPOSE 80
+            EOF
+
+            cat > "${FE_DIR}/nginx.conf" <<'EOF'
+            server {
+              listen 80;
+              server_name _;
+
+              root /usr/share/nginx/html;
+              index index.html;
+
+              location /springboot38hdw40x/ {
+                proxy_http_version 1.1;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_read_timeout 60s;
+                proxy_connect_timeout 5s;
+                proxy_send_timeout 60s;
+
+                proxy_pass http://warehouse-app:8080;
+              }
+
+              location / {
+                try_files $uri $uri/ /index.html;
+              }
+            }
+            EOF
+
+            echo "== Build frontend image on target host =="
+            docker build -f "${FE_DIR}/Dockerfile.ci.frontend" -t "${FE_IMAGE}" "${FE_DIR}"
+
+            echo "== Apply namespace (from ${K8S_DIR}) =="
+            kubectl apply -f "${K8S_DIR}/namespace.yaml"
+
+            echo "== Update image in ${K8S_DIR}/frontend.yaml =="
+            sed -i "s|^\\([[:space:]]*image:[[:space:]]*\\)warehouse-frontend:.*$|\\1${FE_IMAGE}|g" "${K8S_DIR}/frontend.yaml"
+
+            echo "== Apply frontend manifests (from ${K8S_DIR}) =="
+            kubectl apply -f "${K8S_DIR}/frontend.yaml"
+
+            echo "== Rollout status =="
+            kubectl -n "${NAMESPACE}" rollout status deploy/warehouse-frontend --timeout=180s

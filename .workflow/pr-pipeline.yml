@@ -26,6 +26,7 @@ stages:
             - echo "=== Run semgrep (best-effort) ==="
             - semgrep --version
             - semgrep --config p/java --error --timeout 300 .
+            - semgrep --config p/javascript --error --timeout 300 .
 
   - stage:
       name: build
