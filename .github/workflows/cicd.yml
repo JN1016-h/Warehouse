@@ -1,5 +1,9 @@
 # Matches GitHub Actions layout: sidebar jobs sast → unit → integration → container_iac_scan → dast → performance,
 # with performance steps aligned to the reference diagram (k6 + JMeter + artifacts).
+#
+# Production (K8s NodePort): frontend http://47.103.133.105:30080/ — backend http://47.103.133.105:30081/
+# On the cluster/deploy host, manifests are applied from: /opt/k8s/app.yaml and /opt/k8s/frontend.yaml
+# (see repo k8s/*.yaml; Gitee pipeline default K8S_DIR is /opt/k8s).
 name: Cicd
 
 on:
@@ -15,6 +19,9 @@ permissions:
 env:
   IMAGE: warehouse-app:ci-${{ github.sha }}
   APP_HEALTH_URL: http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=1
+  PRODUCTION_FRONTEND_URL: http://47.103.133.105:30080
+  PRODUCTION_BACKEND_URL: http://47.103.133.105:30081
+  K8S_REMOTE_MANIFEST_DIR: /opt/k8s
 
 jobs:
   sast:
@@ -291,3 +298,25 @@ jobs:
         if: always()
         run: |
           docker rm -f warehouse-app-ci 2>/dev/null || true
+
+  production_smoke:
+    name: production_smoke
+    needs: performance
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Echo production targets (K8s NodePort + /opt/k8s manifests)
+        run: |
+          echo "Frontend: ${{ env.PRODUCTION_FRONTEND_URL }}/"
+          echo "Backend:  ${{ env.PRODUCTION_BACKEND_URL }}/springboot38hdw40x/"
+          echo "Manifests on server: ${{ env.K8S_REMOTE_MANIFEST_DIR }}/app.yaml, ${{ env.K8S_REMOTE_MANIFEST_DIR }}/frontend.yaml"
+
+      - name: HTTP check production NodePorts (best-effort)
+        run: |
+          curl -fsS --connect-timeout 8 --max-time 15 \
+            "${{ env.PRODUCTION_BACKEND_URL }}/springboot38hdw40x/config/list?page=1&limit=1" \
+            && echo "backend OK" || echo "backend unreachable from runner (expected if firewall / not deployed)"
+          curl -fsS --connect-timeout 8 --max-time 15 \
+            -o /dev/null -w "frontend HTTP %{http_code}\n" \
+            "${{ env.PRODUCTION_FRONTEND_URL }}/" \
+            || echo "frontend unreachable from runner (expected if firewall / not deployed)"
