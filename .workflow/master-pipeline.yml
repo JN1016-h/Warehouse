@@ -485,7 +485,7 @@ stages:
           cd repo
 
           NAMESPACE="${K8S_NAMESPACE:-warehouse}"
-          K8S_DIR="${K8S_DIR:-/home/k8s}"
+          K8S_DIR="${K8S_DIR:-/opt/k8s}"
           IMAGE="warehouse-app:build.${GITEE_PIPELINE_BUILD_NUMBER}"
 
           echo "== Build image on target host =="
@@ -531,7 +531,7 @@ stages:
           cd repo-fe
 
           NAMESPACE="${K8S_NAMESPACE:-warehouse}"
-          K8S_DIR="${K8S_DIR:-/home/k8s}"
+          K8S_DIR="${K8S_DIR:-/opt/k8s}"
           FE_IMAGE="warehouse-frontend:build.${GITEE_PIPELINE_BUILD_NUMBER}"
 
           FE_DIR="./src/main/resources/admin/admin"

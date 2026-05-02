@@ -1,3 +1,5 @@
+# Backend Service NodePort 30081 — e.g. http://47.103.133.105:30081/
+# On deploy host: keep this file as /opt/k8s/app.yaml (pipeline applies from K8S_DIR).
 apiVersion: v1
 kind: ConfigMap
 metadata:

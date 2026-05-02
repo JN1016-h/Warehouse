@@ -1,3 +1,5 @@
+# Frontend Service NodePort 30080 — e.g. http://47.103.133.105:30080/
+# On deploy host: keep this file as /opt/k8s/frontend.yaml (pipeline applies from K8S_DIR).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
