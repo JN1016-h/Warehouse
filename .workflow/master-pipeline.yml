@@ -1,597 +1,617 @@
 version: '1.0'
 name: master-pipeline
-displayName: MasterPipeline
+displayName: Continuous Integration
 stages:
-  - stage:
-      name: sast
-      displayName: SAST（静态扫描）
-      steps:
-        - step: build@maven
-          name: sast_semgrep
-          displayName: Semgrep SAST
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - echo "=== Install semgrep ==="
-            - apt-get update
-            - apt-get install -y python3 python3-pip
-            - pip3 install --no-cache-dir semgrep
-            - echo "=== Run semgrep (best-effort) ==="
-            - semgrep --version
-            - semgrep --config p/java --error --timeout 300 .
-            - semgrep --config p/javascript --error --timeout 300 .
+  - stage: 
+    name: sast
+    displayName: SAST（静态扫描）
+    strategy: naturally
+    trigger: auto
+    steps:
+      - step: build@maven
+        name: sast_semgrep
+        displayName: Semgrep SAST
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - echo "=== Install semgrep ==="
+          - apt-get update
+          - apt-get install -y python3 python3-pip
+          - pip3 install --no-cache-dir semgrep
+          - echo "=== Run semgrep (best-effort) ==="
+          - semgrep --version
+          - semgrep --config p/java --error --timeout 300 .
+          - semgrep --config p/javascript --error --timeout 300 .
 
-  - stage:
-      name: build
-      displayName: 构建（master）
-      steps:
-        - step: build@maven
-          name: build_maven
-          displayName: Maven 构建（JAR）
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - echo "=== Maven build (skip tests) ==="
-            - mvn -B -ntp clean package -Dmaven.test.skip=true
-          artifacts:
-            - name: BUILD_ARTIFACT
-              path:
-                - ./target/*.jar
+  - stage: 
+    name: build
+    displayName: 构建（master）
+    strategy: naturally
+    trigger: auto
+    steps:
+      - step: build@maven
+        name: build_maven
+        displayName: Maven 构建（JAR）
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - echo "=== Maven build (skip tests) ==="
+          - mvn -B -ntp clean package -Dmaven.test.skip=true
+        artifacts:
+          - name: BUILD_ARTIFACT
+            path:
+              - ./target/*.jar
 
-        - step: publish@general_artifacts
-          name: publish_general_artifacts
-          displayName: 上传制品（master）
-          dependArtifact: BUILD_ARTIFACT
-          artifactName: backend-jar
-          dependsOn: build_maven
+      - step: publish@general_artifacts
+        name: publish_general_artifacts
+        displayName: 上传制品（master）
+        dependArtifact: BUILD_ARTIFACT
+        artifactName: backend-jar
+        dependsOn: build_maven
 
-        - step: build@maven
-          name: pack_deploy_bundle
-          displayName: 打包 K8S 部署包（源码 + k8s + db）
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - echo "=== Prepare deploy bundle ==="
-            - rm -rf src/main/resources/admin/admin/node_modules || true
-            - mkdir -p deploy
-            - tar -czf deploy/deploy-package.tar.gz Dockerfile pom.xml src k8s db tests
-            - ls -lah deploy || true
-          artifacts:
-            - name: DEPLOY_BUNDLE
-              path:
-                - ./deploy/deploy-package.tar.gz
+      - step: build@maven
+        name: pack_deploy_bundle
+        displayName: 打包 K8S 部署包（源码 + k8s + db）
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - echo "=== Prepare deploy bundle ==="
+          - rm -rf src/main/resources/admin/admin/node_modules || true
+          - mkdir -p deploy
+          - tar -czf deploy/deploy-package.tar.gz Dockerfile pom.xml src k8s db tests
+          - ls -lah deploy || true
+        artifacts:
+          - name: DEPLOY_BUNDLE
+            path:
+              - ./deploy/deploy-package.tar.gz
 
-        - step: publish@general_artifacts
-          name: publish_deploy_bundle
-          displayName: 上传部署包（master）
-          dependArtifact: DEPLOY_BUNDLE
-          artifactName: deploy-bundle
-          dependsOn: pack_deploy_bundle
+      - step: publish@general_artifacts
+        name: publish_deploy_bundle
+        displayName: 上传部署包（master）
+        dependArtifact: DEPLOY_BUNDLE
+        artifactName: deploy-bundle
+        dependsOn: pack_deploy_bundle
 
-  - stage:
-      name: unit
-      displayName: unit（单元测试）
-      steps:
-        - step: build@maven
-          name: unit_test
-          displayName: Maven test
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - echo "=== Maven unit tests ==="
-            - mvn -B -ntp test -DskipTests=false -Dmaven.test.skip=false
+  - stage: 
+    name: unit
+    displayName: unit（单元测试）
+    strategy: naturally
+    trigger: auto
+    steps:
+      - step: build@maven
+        name: unit_test
+        displayName: Maven test
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - echo "=== Maven unit tests ==="
+          - mvn -B -ntp test -DskipTests=false -Dmaven.test.skip=false
 
-  - stage:
-      name: integration
-      displayName: integration（集成测试）
-      steps:
-        - step: build@maven
-          name: integration_smoke
-          displayName: Integration smoke (placeholder)
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - echo "=== Integration smoke ==="
-            - echo "No dedicated IT yet; add tests under src/test or a dedicated IT profile when ready."
+  - stage: 
+    name: integration
+    displayName: integration（集成测试）
+    strategy: naturally
+    trigger: auto
+    steps:
+      - step: build@maven
+        name: integration_smoke
+        displayName: Integration smoke (placeholder)
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - echo "=== Integration smoke ==="
+          - echo "No dedicated IT yet; add tests under src/test or a dedicated IT profile when ready."
 
-  - stage:
-      name: image
-      displayName: 构建镜像（本地，不推送）
-      steps:
-        - step: build@maven
-          name: docker_build_local
-          displayName: Docker build (local)
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - echo "=== Build docker image locally (no push) ==="
-            - docker --version
-            - IMAGE="warehouse-app:build.${GITEE_PIPELINE_BUILD_NUMBER}"
-            - echo "IMAGE=${IMAGE}"
-            - docker build -f ./Dockerfile -t "${IMAGE}" .
-            - docker image ls | head -n 20 || true
+  - stage: 
+    name: image
+    displayName: 构建镜像（本地，不推送）
+    strategy: naturally
+    trigger: auto
+    steps:
+      - step: build@maven
+        name: docker_build_local
+        displayName: Docker build (local)
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - echo "=== Build docker image locally (no push) ==="
+          - docker --version
+          - IMAGE="warehouse-app:build.${GITEE_PIPELINE_BUILD_NUMBER}"
+          - echo "IMAGE=${IMAGE}"
+          - docker build -f ./Dockerfile -t "${IMAGE}" .
+          - docker image ls | head -n 20 || true
 
-  - stage:
-      name: container_iac_scan
-      displayName: container_iac_scan（镜像&配置扫描）
-      steps:
-        - step: build@maven
-          name: trivy_scan
-          displayName: Trivy scan (fs + image)
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - echo "=== Install trivy ==="
-            - apt-get update
-            - apt-get install -y wget ca-certificates
-            - wget -q https://github.com/aquasecurity/trivy/releases/download/v0.53.0/trivy_0.53.0_Linux-64bit.deb -O /tmp/trivy.deb
-            - dpkg -i /tmp/trivy.deb || (apt-get -f install -y && dpkg -i /tmp/trivy.deb)
-            - trivy --version
-            - echo "=== Trivy filesystem (best-effort) ==="
-            - trivy fs --scanners vuln,config --exit-code 0 --timeout 10m .
-            - IMAGE="warehouse-app:build.${GITEE_PIPELINE_BUILD_NUMBER}"
-            - echo "=== Trivy image (best-effort): ${IMAGE} ==="
-            - trivy image --exit-code 0 --timeout 15m "${IMAGE}"
+  - stage: 
+    name: container_iac_scan
+    displayName: container_iac_scan（镜像&配置扫描）
+    strategy: naturally
+    trigger: auto
+    steps:
+      - step: build@maven
+        name: trivy_scan
+        displayName: Trivy scan (fs + image)
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - echo "=== Install trivy ==="
+          - apt-get update
+          - apt-get install -y wget ca-certificates
+          - wget -q https://github.com/aquasecurity/trivy/releases/download/v0.53.0/trivy_0.53.0_Linux-64bit.deb -O /tmp/trivy.deb
+          - dpkg -i /tmp/trivy.deb || (apt-get -f install -y && dpkg -i /tmp/trivy.deb)
+          - trivy --version
+          - echo "=== Trivy filesystem (best-effort) ==="
+          - trivy fs --scanners vuln,config --exit-code 0 --timeout 10m .
+          - IMAGE="warehouse-app:build.${GITEE_PIPELINE_BUILD_NUMBER}"
+          - echo "=== Trivy image (best-effort): ${IMAGE} ==="
+          - trivy image --exit-code 0 --timeout 15m "${IMAGE}"
 
-  - stage:
-      name: dast
-      displayName: dast（动态扫描）
-      steps:
-        - step: build@maven
-          name: zap_baseline
-          displayName: OWASP ZAP baseline (best-effort)
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - echo "=== Prepare docker ==="
-            - docker --version
-            - IMAGE="warehouse-app:build.${GITEE_PIPELINE_BUILD_NUMBER}"
-            - echo "=== Run app locally: ${IMAGE} ==="
-            - docker rm -f warehouse-app-ci || true
-            - docker run -d --name warehouse-app-ci --network host -e "JAVA_OPTS=-Xms256m -Xmx512m" "${IMAGE}"
-            - echo "=== Wait for app to be ready ==="
-            - for i in $(seq 1 60); do curl -fsS "http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=1" && break || true; sleep 2; done
-            - echo "=== Run ZAP baseline ==="
-            - docker run --rm --network host -v "$(pwd)":/zap/wrk owasp/zap2docker-stable zap-baseline.py -t "http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=1" -r zap-report.html || true
-            - ls -lah zap-report.html || true
-            - docker rm -f warehouse-app-ci || true
+  - stage: 
+    name: dast
+    displayName: dast（动态扫描）
+    strategy: naturally
+    trigger: auto
+    steps:
+      - step: build@maven
+        name: zap_baseline
+        displayName: OWASP ZAP baseline (best-effort)
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - echo "=== Prepare docker ==="
+          - docker --version
+          - IMAGE="warehouse-app:build.${GITEE_PIPELINE_BUILD_NUMBER}"
+          - echo "=== Run app locally: ${IMAGE} ==="
+          - docker rm -f warehouse-app-ci || true
+          - docker run -d --name warehouse-app-ci --network host -e "JAVA_OPTS=-Xms256m -Xmx512m" "${IMAGE}"
+          - echo "=== Wait for app to be ready ==="
+          - for i in $(seq 1 60); do curl -fsS "http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=1" && break || true; sleep 2; done
+          - echo "=== Run ZAP baseline ==="
+          - docker run --rm --network host -v "$(pwd)":/zap/wrk owasp/zap2docker-stable zap-baseline.py -t "http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=1" -r zap-report.html || true
+          - ls -lah zap-report.html || true
+          - docker rm -f warehouse-app-ci || true
 
-  - stage:
-      name: performance
-      displayName: performance（性能测试）
-      steps:
-        - step: build@maven
-          name: perf_prepare
-          displayName: Set up job / Checkout / Launch perf env / Wait
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - echo "Set up job"
-            - mkdir -p perf-artifacts/jmeter perf-artifacts/k6 tests/jmeter/output
-            - docker --version
+  - stage: 
+    name: performance
+    displayName: performance（性能测试）
+    strategy: naturally
+    trigger: auto
+    steps:
+      - step: build@maven
+        name: perf_prepare
+        displayName: Set up job / Checkout / Launch perf env / Wait
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - echo "Set up job"
+          - mkdir -p perf-artifacts/jmeter perf-artifacts/k6 tests/jmeter/output
+          - docker --version
 
-            - echo "Checkout code"
-            - pwd
-            - ls -lah
+          - echo "Checkout code"
+          - pwd
+          - ls -lah
 
-            - IMAGE="warehouse-app:build.${GITEE_PIPELINE_BUILD_NUMBER}"
-            - echo "Launch perf env (gunicorn)"
-            - docker rm -f warehouse-app-ci || true
-            - docker run -d --name warehouse-app-ci --network host -e "JAVA_OPTS=-Xms256m -Xmx512m" "${IMAGE}"
+          - IMAGE="warehouse-app:build.${GITEE_PIPELINE_BUILD_NUMBER}"
+          - echo "Launch perf env (gunicorn)"
+          - docker rm -f warehouse-app-ci || true
+          - docker run -d --name warehouse-app-ci --network host -e "JAVA_OPTS=-Xms256m -Xmx512m" "${IMAGE}"
 
-            - echo "Wait for services to be ready"
-            - apt-get update
-            - apt-get install -y curl ca-certificates
-            - for i in $(seq 1 60); do curl -fsS "http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=1" && break || true; sleep 2; done
+          - echo "Wait for services to be ready"
+          - apt-get update
+          - apt-get install -y curl ca-certificates
+          - for i in $(seq 1 60); do curl -fsS "http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=1" && break || true; sleep 2; done
 
-        - step: build@maven
-          name: perf_k6_install
-          displayName: Install k6
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - apt-get update
-            - apt-get install -y ca-certificates curl tar
-            - curl -fsSL -o /tmp/k6.tgz https://github.com/grafana/k6/releases/download/v0.49.0/k6-v0.49.0-linux-amd64.tar.gz
-            - tar -C /tmp -xzf /tmp/k6.tgz
-            - install -m 0755 /tmp/k6-v0.49.0-linux-amd64/k6 /usr/local/bin/k6
-            - k6 version
-          dependsOn: perf_prepare
+      - step: build@maven
+        name: perf_k6_install
+        displayName: Install k6
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - apt-get update
+          - apt-get install -y ca-certificates curl tar
+          - curl -fsSL -o /tmp/k6.tgz https://github.com/grafana/k6/releases/download/v0.49.0/k6-v0.49.0-linux-amd64.tar.gz
+          - tar -C /tmp -xzf /tmp/k6.tgz
+          - install -m 0755 /tmp/k6-v0.49.0-linux-amd64/k6 /usr/local/bin/k6
+          - k6 version
+        dependsOn: perf_prepare
 
-        - step: build@maven
-          name: perf_k6_verify
-          displayName: Verify target endpoint before k6 test
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - apt-get update
-            - apt-get install -y curl ca-certificates
-            - curl -fsS "http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=5"
-          dependsOn: perf_k6_install
+      - step: build@maven
+        name: perf_k6_verify
+        displayName: Verify target endpoint before k6 test
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - apt-get update
+          - apt-get install -y curl ca-certificates
+          - curl -fsS "http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=5"
+        dependsOn: perf_k6_install
 
-        - step: build@maven
-          name: perf_k6_run
-          displayName: k6 load test
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - |
-              if ! command -v k6 >/dev/null 2>&1; then
-                apt-get update
-                apt-get install -y ca-certificates curl tar
-                curl -fsSL -o /tmp/k6.tgz https://github.com/grafana/k6/releases/download/v0.49.0/k6-v0.49.0-linux-amd64.tar.gz
-                tar -C /tmp -xzf /tmp/k6.tgz
-                install -m 0755 /tmp/k6-v0.49.0-linux-amd64/k6 /usr/local/bin/k6
-              fi
-              k6 version
-            - mkdir -p perf-artifacts/k6
-            - k6 run --out json=perf-artifacts/k6/raw.json -e BASE_URL="http://127.0.0.1:8080/springboot38hdw40x" tests/k6/smoke.js
-          dependsOn: perf_k6_verify
+      - step: build@maven
+        name: perf_k6_run
+        displayName: k6 load test
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - |
+            if ! command -v k6 >/dev/null 2>&1; then
+              apt-get update
+              apt-get install -y ca-certificates curl tar
+              curl -fsSL -o /tmp/k6.tgz https://github.com/grafana/k6/releases/download/v0.49.0/k6-v0.49.0-linux-amd64.tar.gz
+              tar -C /tmp -xzf /tmp/k6.tgz
+              install -m 0755 /tmp/k6-v0.49.0-linux-amd64/k6 /usr/local/bin/k6
+            fi
+            k6 version
+          - mkdir -p perf-artifacts/k6
+          - k6 run --out json=perf-artifacts/k6/raw.json -e BASE_URL="http://127.0.0.1:8080/springboot38hdw40x" tests/k6/smoke.js
+        dependsOn: perf_k6_verify
 
-        - step: build@maven
-          name: perf_k6_summary
-          displayName: Generate k6 summary
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - apt-get update
-            - apt-get install -y python3
-            - python3 - <<'PY'
-            import json
-            from pathlib import Path
-            p = Path('perf-artifacts/k6/raw.json')
-            lines = [json.loads(l) for l in p.read_text(encoding='utf-8', errors='ignore').splitlines() if l.strip()]
-            samples = [float(x['metric_value']) for x in lines if x.get('type')=='Point' and x.get('metric')=='http_req_duration']
-            failed = [x for x in lines if x.get('type')=='Point' and x.get('metric')=='http_req_failed' and float(x.get('metric_value',0))>0]
-            out = Path('perf-artifacts/k6/summary.txt')
-            out.parent.mkdir(parents=True, exist_ok=True)
-            if samples:
-              s = sorted(samples)
-              def pct(q):
-                idx = int(round((len(s)-1)*q))
-                return s[max(0, min(len(s)-1, idx))]
-              out.write_text(
-                "k6 http_req_duration samples: %d\n" % len(samples)
-                + "avg=%.2f ms\n" % (sum(samples)/len(samples))
-                + "p50=%.2f ms\n" % pct(0.50)
-                + "p95=%.2f ms\n" % pct(0.95)
-                + "max=%.2f ms\n" % max(samples)
-                + "http_req_failed_points=%d\n" % len(failed),
-                encoding='utf-8'
-              )
-            else:
-              out.write_text("No http_req_duration samples parsed from raw.json\n", encoding='utf-8')
-            PY
-          dependsOn: perf_k6_run
+      - step: build@maven
+        name: perf_k6_summary
+        displayName: Generate k6 summary
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - apt-get update
+          - apt-get install -y python3
+          - python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('perf-artifacts/k6/raw.json')
+          lines = [json.loads(l) for l in p.read_text(encoding='utf-8', errors='ignore').splitlines() if l.strip()]
+          samples = [float(x['metric_value']) for x in lines if x.get('type')=='Point' and x.get('metric')=='http_req_duration']
+          failed = [x for x in lines if x.get('type')=='Point' and x.get('metric')=='http_req_failed' and float(x.get('metric_value',0))>0]
+          out = Path('perf-artifacts/k6/summary.txt')
+          out.parent.mkdir(parents=True, exist_ok=True)
+          if samples:
+            s = sorted(samples)
+            def pct(q):
+              idx = int(round((len(s)-1)*q))
+              return s[max(0, min(len(s)-1, idx))]
+            out.write_text(
+              "k6 http_req_duration samples: %d\n" % len(samples)
+              + "avg=%.2f ms\n" % (sum(samples)/len(samples))
+              + "p50=%.2f ms\n" % pct(0.50)
+              + "p95=%.2f ms\n" % pct(0.95)
+              + "max=%.2f ms\n" % max(samples)
+              + "http_req_failed_points=%d\n" % len(failed),
+              encoding='utf-8'
+            )
+          else:
+            out.write_text("No http_req_duration samples parsed from raw.json\n", encoding='utf-8')
+          PY
+        dependsOn: perf_k6_run
 
-        - step: build@maven
-          name: perf_k6_upload_prep
-          displayName: Upload k6 artifacts (prepare)
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - tar -czf perf-artifacts/k6.tgz perf-artifacts/k6 || true
-          artifacts:
-            - name: K6_ARTIFACTS
-              path:
-                - ./perf-artifacts/k6.tgz
-          dependsOn: perf_k6_summary
+      - step: build@maven
+        name: perf_k6_upload_prep
+        displayName: Upload k6 artifacts (prepare)
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - tar -czf perf-artifacts/k6.tgz perf-artifacts/k6 || true
+        artifacts:
+          - name: K6_ARTIFACTS
+            path:
+              - ./perf-artifacts/k6.tgz
+        dependsOn: perf_k6_summary
 
-        - step: publish@general_artifacts
-          name: perf_publish_k6
-          displayName: Upload k6 artifacts
-          dependArtifact: K6_ARTIFACTS
-          artifactName: k6-output
-          dependsOn: perf_k6_upload_prep
+      - step: publish@general_artifacts
+        name: perf_publish_k6
+        displayName: Upload k6 artifacts
+        dependArtifact: K6_ARTIFACTS
+        artifactName: k6-output
+        dependsOn: perf_k6_upload_prep
 
-        - step: build@maven
-          name: perf_jmeter_install
-          displayName: Install JMeter
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - apt-get update
-            - apt-get install -y ca-certificates curl tar
-            - JMETER_VER=5.6.3
-            - curl -fsSL -o /tmp/jmeter.tgz "https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-${JMETER_VER}.tgz"
-            - tar -C /opt -xzf /tmp/jmeter.tgz
-            - export JMETER_HOME="/opt/apache-jmeter-${JMETER_VER}"
-            - export PATH="$JMETER_HOME/bin:$PATH"
-            - jmeter -v
-          dependsOn: perf_prepare
+      - step: build@maven
+        name: perf_jmeter_install
+        displayName: Install JMeter
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - apt-get update
+          - apt-get install -y ca-certificates curl tar
+          - JMETER_VER=5.6.3
+          - curl -fsSL -o /tmp/jmeter.tgz "https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-${JMETER_VER}.tgz"
+          - tar -C /opt -xzf /tmp/jmeter.tgz
+          - export JMETER_HOME="/opt/apache-jmeter-${JMETER_VER}"
+          - export PATH="$JMETER_HOME/bin:$PATH"
+          - jmeter -v
+        dependsOn: perf_prepare
 
-        - step: build@maven
-          name: perf_jmeter_security
-          displayName: Configure JMeter security settings
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - printf "jmeter.save.saveservice.timestamp_format=yyyy/MM/dd HH:mm:ss\njmeter.save.saveservice.default_delimiter=,\n" > /tmp/jmeter-user.properties
-          dependsOn: perf_jmeter_install
+      - step: build@maven
+        name: perf_jmeter_security
+        displayName: Configure JMeter security settings
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - printf "jmeter.save.saveservice.timestamp_format=yyyy/MM/dd HH:mm:ss\njmeter.save.saveservice.default_delimiter=,\n" > /tmp/jmeter-user.properties
+        dependsOn: perf_jmeter_install
 
-        - step: build@maven
-          name: perf_jmeter_run
-          displayName: Run JMeter plan
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - |
-              JMETER_VER=5.6.3
+      - step: build@maven
+        name: perf_jmeter_run
+        displayName: Run JMeter plan
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - |
+            JMETER_VER=5.6.3
+            export JMETER_HOME="/opt/apache-jmeter-${JMETER_VER}"
+            export PATH="$JMETER_HOME/bin:$PATH"
+            if ! command -v jmeter >/dev/null 2>&1; then
+              apt-get update
+              apt-get install -y ca-certificates curl tar
+              curl -fsSL -o /tmp/jmeter.tgz "https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-${JMETER_VER}.tgz"
+              tar -C /opt -xzf /tmp/jmeter.tgz
               export JMETER_HOME="/opt/apache-jmeter-${JMETER_VER}"
               export PATH="$JMETER_HOME/bin:$PATH"
-              if ! command -v jmeter >/dev/null 2>&1; then
-                apt-get update
-                apt-get install -y ca-certificates curl tar
-                curl -fsSL -o /tmp/jmeter.tgz "https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-${JMETER_VER}.tgz"
-                tar -C /opt -xzf /tmp/jmeter.tgz
-                export JMETER_HOME="/opt/apache-jmeter-${JMETER_VER}"
-                export PATH="$JMETER_HOME/bin:$PATH"
-              fi
-              jmeter -v
-            - JMETER_VER=5.6.3
-            - export JMETER_HOME="/opt/apache-jmeter-${JMETER_VER}"
-            - export PATH="$JMETER_HOME/bin:$PATH"
-            - mkdir -p tests/jmeter/output perf-artifacts/jmeter
-            - cp tests/jmeter/warehouse-load.jmx /tmp/warehouse-load.ci.jmx
-            - sed -i 's/<stringProp name="HTTPSampler.domain">47.103.133.105<\\/stringProp>/<stringProp name="HTTPSampler.domain">127.0.0.1<\\/stringProp>/g' /tmp/warehouse-load.ci.jmx
-            - sed -i 's/<stringProp name="HTTPSampler.port">30081<\\/stringProp>/<stringProp name="HTTPSampler.port">8080<\\/stringProp>/g' /tmp/warehouse-load.ci.jmx
-            - jmeter -n -t /tmp/warehouse-load.ci.jmx -l tests/jmeter/output/result.jtl -j tests/jmeter/output/jmeter.log -q /tmp/jmeter-user.properties
-          dependsOn: perf_jmeter_security
+            fi
+            jmeter -v
+          - JMETER_VER=5.6.3
+          - export JMETER_HOME="/opt/apache-jmeter-${JMETER_VER}"
+          - export PATH="$JMETER_HOME/bin:$PATH"
+          - mkdir -p tests/jmeter/output perf-artifacts/jmeter
+          - cp tests/jmeter/warehouse-load.jmx /tmp/warehouse-load.ci.jmx
+          - sed -i 's/<stringProp name="HTTPSampler.domain">47.103.133.105<\\/stringProp>/<stringProp name="HTTPSampler.domain">127.0.0.1<\\/stringProp>/g' /tmp/warehouse-load.ci.jmx
+          - sed -i 's/<stringProp name="HTTPSampler.port">30081<\\/stringProp>/<stringProp name="HTTPSampler.port">8080<\\/stringProp>/g' /tmp/warehouse-load.ci.jmx
+          - jmeter -n -t /tmp/warehouse-load.ci.jmx -l tests/jmeter/output/result.jtl -j tests/jmeter/output/jmeter.log -q /tmp/jmeter-user.properties
+        dependsOn: perf_jmeter_security
 
-        - step: build@maven
-          name: perf_jmeter_report
-          displayName: Generate JMeter HTML report
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - |
-              JMETER_VER=5.6.3
+      - step: build@maven
+        name: perf_jmeter_report
+        displayName: Generate JMeter HTML report
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - |
+            JMETER_VER=5.6.3
+            export JMETER_HOME="/opt/apache-jmeter-${JMETER_VER}"
+            export PATH="$JMETER_HOME/bin:$PATH"
+            if ! command -v jmeter >/dev/null 2>&1; then
+              apt-get update
+              apt-get install -y ca-certificates curl tar
+              curl -fsSL -o /tmp/jmeter.tgz "https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-${JMETER_VER}.tgz"
+              tar -C /opt -xzf /tmp/jmeter.tgz
               export JMETER_HOME="/opt/apache-jmeter-${JMETER_VER}"
               export PATH="$JMETER_HOME/bin:$PATH"
-              if ! command -v jmeter >/dev/null 2>&1; then
-                apt-get update
-                apt-get install -y ca-certificates curl tar
-                curl -fsSL -o /tmp/jmeter.tgz "https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-${JMETER_VER}.tgz"
-                tar -C /opt -xzf /tmp/jmeter.tgz
-                export JMETER_HOME="/opt/apache-jmeter-${JMETER_VER}"
-                export PATH="$JMETER_HOME/bin:$PATH"
-              fi
-              jmeter -v
-            - JMETER_VER=5.6.3
-            - export JMETER_HOME="/opt/apache-jmeter-${JMETER_VER}"
-            - export PATH="$JMETER_HOME/bin:$PATH"
-            - rm -rf tests/jmeter/output/html-report || true
-            - jmeter -g tests/jmeter/output/result.jtl -o tests/jmeter/output/html-report
-          dependsOn: perf_jmeter_run
+            fi
+            jmeter -v
+          - JMETER_VER=5.6.3
+          - export JMETER_HOME="/opt/apache-jmeter-${JMETER_VER}"
+          - export PATH="$JMETER_HOME/bin:$PATH"
+          - rm -rf tests/jmeter/output/html-report || true
+          - jmeter -g tests/jmeter/output/result.jtl -o tests/jmeter/output/html-report
+        dependsOn: perf_jmeter_run
 
-        - step: build@maven
-          name: perf_jmeter_summary
-          displayName: Generate JMeter JTL summary
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - apt-get update
-            - apt-get install -y python3
-            - python3 - <<'PY'
-            import csv
-            from pathlib import Path
-            from statistics import mean
-            jtl = Path('tests/jmeter/output/result.jtl')
-            out = Path('perf-artifacts/jmeter/jtl-summary.txt')
-            out.parent.mkdir(parents=True, exist_ok=True)
-            if not jtl.exists():
-              out.write_text('missing result.jtl\n', encoding='utf-8')
-              raise SystemExit(0)
-            rows = []
-            with jtl.open('r', encoding='utf-8', errors='ignore', newline='') as f:
-              reader = csv.DictReader(f)
-              for r in reader:
-                try:
-                  elapsed = float(r.get('elapsed','0'))
-                except Exception:
-                  continue
-                rows.append(elapsed)
-            if not rows:
-              out.write_text('no samples parsed from jtl\n', encoding='utf-8')
-            else:
-              s = sorted(rows)
-              def pct(q):
-                idx = int(round((len(s)-1)*q))
-                return s[max(0, min(len(s)-1, idx))]
-              out.write_text(
-                "samples=%d\navg=%.2f ms\np50=%.2f ms\np95=%.2f ms\nmax=%.2f ms\n" % (len(rows), mean(rows), pct(0.50), pct(0.95), max(rows)),
-                encoding='utf-8'
-              )
-            PY
-          dependsOn: perf_jmeter_report
+      - step: build@maven
+        name: perf_jmeter_summary
+        displayName: Generate JMeter JTL summary
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - apt-get update
+          - apt-get install -y python3
+          - python3 - <<'PY'
+          import csv
+          from pathlib import Path
+          from statistics import mean
+          jtl = Path('tests/jmeter/output/result.jtl')
+          out = Path('perf-artifacts/jmeter/jtl-summary.txt')
+          out.parent.mkdir(parents=True, exist_ok=True)
+          if not jtl.exists():
+            out.write_text('missing result.jtl\n', encoding='utf-8')
+            raise SystemExit(0)
+          rows = []
+          with jtl.open('r', encoding='utf-8', errors='ignore', newline='') as f:
+            reader = csv.DictReader(f)
+            for r in reader:
+              try:
+                elapsed = float(r.get('elapsed','0'))
+              except Exception:
+                continue
+              rows.append(elapsed)
+          if not rows:
+            out.write_text('no samples parsed from jtl\n', encoding='utf-8')
+          else:
+            s = sorted(rows)
+            def pct(q):
+              idx = int(round((len(s)-1)*q))
+              return s[max(0, min(len(s)-1, idx))]
+            out.write_text(
+              "samples=%d\navg=%.2f ms\np50=%.2f ms\np95=%.2f ms\nmax=%.2f ms\n" % (len(rows), mean(rows), pct(0.50), pct(0.95), max(rows)),
+              encoding='utf-8'
+            )
+          PY
+        dependsOn: perf_jmeter_report
 
-        - step: build@maven
-          name: perf_jmeter_upload_prep
-          displayName: Upload JMeter artifacts (prepare)
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - tar -czf perf-artifacts/jmeter.tgz perf-artifacts/jmeter tests/jmeter/output || true
-          artifacts:
-            - name: JMETER_ARTIFACTS
-              path:
-                - ./perf-artifacts/jmeter.tgz
-          dependsOn: perf_jmeter_summary
+      - step: build@maven
+        name: perf_jmeter_upload_prep
+        displayName: Upload JMeter artifacts (prepare)
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - tar -czf perf-artifacts/jmeter.tgz perf-artifacts/jmeter tests/jmeter/output || true
+        artifacts:
+          - name: JMETER_ARTIFACTS
+            path:
+              - ./perf-artifacts/jmeter.tgz
+        dependsOn: perf_jmeter_summary
 
-        - step: publish@general_artifacts
-          name: perf_publish_jmeter
-          displayName: Upload JMeter artifacts
-          dependArtifact: JMETER_ARTIFACTS
-          artifactName: jmeter-output
-          dependsOn: perf_jmeter_upload_prep
+      - step: publish@general_artifacts
+        name: perf_publish_jmeter
+        displayName: Upload JMeter artifacts
+        dependArtifact: JMETER_ARTIFACTS
+        artifactName: jmeter-output
+        dependsOn: perf_jmeter_upload_prep
 
-        - step: build@maven
-          name: perf_finalize
-          displayName: List generated files / teardown / pack bundle
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - echo "List generated files"
-            - ls -lah perf-artifacts/k6 || true
-            - ls -lah perf-artifacts/jmeter || true
-            - ls -lah tests/jmeter/output || true
+      - step: build@maven
+        name: perf_finalize
+        displayName: List generated files / teardown / pack bundle
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - echo "List generated files"
+          - ls -lah perf-artifacts/k6 || true
+          - ls -lah perf-artifacts/jmeter || true
+          - ls -lah tests/jmeter/output || true
 
-            - echo "Post Checkout code"
-            - echo "(noop)"
+          - echo "Post Checkout code"
+          - echo "(noop)"
 
-            - echo "Complete job"
-            - docker rm -f warehouse-app-ci || true
+          - echo "Complete job"
+          - docker rm -f warehouse-app-ci || true
 
-            - echo "Pack perf artifacts"
-            - apt-get update
-            - apt-get install -y tar
-            - tar -czf perf-artifacts.tgz perf-artifacts/k6.tgz perf-artifacts/jmeter.tgz || true
-          artifacts:
-            - name: PERF_ARTIFACTS
-              path:
-                - ./perf-artifacts.tgz
-          dependsOn:
-            - perf_publish_k6
-            - perf_publish_jmeter
+          - echo "Pack perf artifacts"
+          - apt-get update
+          - apt-get install -y tar
+          - tar -czf perf-artifacts.tgz perf-artifacts/k6.tgz perf-artifacts/jmeter.tgz || true
+        artifacts:
+          - name: PERF_ARTIFACTS
+            path:
+              - ./perf-artifacts.tgz
+        dependsOn:
+          - perf_publish_k6
+          - perf_publish_jmeter
 
-        - step: publish@general_artifacts
-          name: perf_publish_bundle
-          displayName: Upload combined perf bundle
-          dependArtifact: PERF_ARTIFACTS
-          artifactName: perf-bundle
-          dependsOn: perf_finalize
+      - step: publish@general_artifacts
+        name: perf_publish_bundle
+        displayName: Upload combined perf bundle
+        dependArtifact: PERF_ARTIFACTS
+        artifactName: perf-bundle
+        dependsOn: perf_finalize
 
-  - stage:
-      name: deploy
-      displayName: deploy（K8S 发布部署）
-      steps:
-        - step: deploy@agent
-          name: deploy_k8s_agent
-          displayName: 主机部署（docker build + kubectl apply）
-          hostGroupID: ${HOST_GROUP_ID}
-          deployArtifact:
-            - source: build
-              name: deploy-bundle
-              target: ~/gitee_go/deploy
-              dependArtifact: deploy-bundle
-          script: |
-            set -e
-            cd ~/gitee_go/deploy
-            rm -rf repo || true
-            mkdir -p repo
-            tar -xzf deploy-bundle.tar.gz -C repo
-            cd repo
+  - stage: 
+    name: deploy
+    displayName: deploy（K8S 发布部署）
+    strategy: naturally
+    trigger: auto
+    steps:
+      - step: deploy@agent
+        name: deploy_k8s_agent
+        displayName: 主机部署（docker build + kubectl apply）
+        hostGroupID: ${HOST_GROUP_ID}
+        deployArtifact:
+          - source: build
+            name: deploy-bundle
+            target: ~/gitee_go/deploy
+            dependArtifact: deploy-bundle
+        script: |
+          set -e
+          cd ~/gitee_go/deploy
+          rm -rf repo || true
+          mkdir -p repo
+          tar -xzf deploy-bundle.tar.gz -C repo
+          cd repo
 
-            NAMESPACE="${K8S_NAMESPACE:-warehouse}"
-            K8S_DIR="${K8S_DIR:-/home/k8s}"
-            IMAGE="warehouse-app:build.${GITEE_PIPELINE_BUILD_NUMBER}"
+          NAMESPACE="${K8S_NAMESPACE:-warehouse}"
+          K8S_DIR="${K8S_DIR:-/home/k8s}"
+          IMAGE="warehouse-app:build.${GITEE_PIPELINE_BUILD_NUMBER}"
 
-            echo "== Build image on target host =="
-            docker build -t "${IMAGE}" -f ./Dockerfile .
+          echo "== Build image on target host =="
+          docker build -t "${IMAGE}" -f ./Dockerfile .
 
-            echo "== Apply namespace (from ${K8S_DIR}) =="
-            kubectl apply -f "${K8S_DIR}/namespace.yaml"
+          echo "== Apply namespace (from ${K8S_DIR}) =="
+          kubectl apply -f "${K8S_DIR}/namespace.yaml"
 
-            echo "== Update app image in ${K8S_DIR}/app.yaml =="
-            sed -i "s|^\\([[:space:]]*image:[[:space:]]*\\)warehouse-app:.*$|\\1${IMAGE}|g" "${K8S_DIR}/app.yaml"
+          echo "== Update app image in ${K8S_DIR}/app.yaml =="
+          sed -i "s|^\\([[:space:]]*image:[[:space:]]*\\)warehouse-app:.*$|\\1${IMAGE}|g" "${K8S_DIR}/app.yaml"
 
-            echo "== Ensure MySQL 8 allowPublicKeyRetrieval=true in ${K8S_DIR}/app.yaml =="
-            sed -i 's|\(jdbc:mysql://mysql:3306/springboot38hdw40x[^"]*\)|\1\&allowPublicKeyRetrieval=true|g' "${K8S_DIR}/app.yaml"
-            sed -i 's|allowPublicKeyRetrieval=true\&allowPublicKeyRetrieval=true|allowPublicKeyRetrieval=true|g' "${K8S_DIR}/app.yaml"
+          echo "== Ensure MySQL 8 allowPublicKeyRetrieval=true in ${K8S_DIR}/app.yaml =="
+          sed -i 's|\(jdbc:mysql://mysql:3306/springboot38hdw40x[^"]*\)|\1\&allowPublicKeyRetrieval=true|g' "${K8S_DIR}/app.yaml"
+          sed -i 's|allowPublicKeyRetrieval=true\&allowPublicKeyRetrieval=true|allowPublicKeyRetrieval=true|g' "${K8S_DIR}/app.yaml"
 
-            echo "== Apply app manifests (from ${K8S_DIR}) =="
-            kubectl apply -f "${K8S_DIR}/app.yaml"
+          echo "== Apply app manifests (from ${K8S_DIR}) =="
+          kubectl apply -f "${K8S_DIR}/app.yaml"
 
-            echo "== Rollout status =="
-            kubectl -n "${NAMESPACE}" rollout status deploy/warehouse-app --timeout=180s
+          echo "== Rollout status =="
+          kubectl -n "${NAMESPACE}" rollout status deploy/warehouse-app --timeout=180s
 
-  - stage:
-      name: deploy_frontend
-      displayName: deploy_frontend（K8S 发布部署）
-      steps:
-        - step: deploy@agent
-          name: deploy_k8s_frontend_agent
-          displayName: 主机部署（frontend docker build + kubectl apply）
-          hostGroupID: ${HOST_GROUP_ID}
-          deployArtifact:
-            - source: build
-              name: deploy-bundle
-              target: ~/gitee_go/deploy
-              dependArtifact: deploy-bundle
-          script: |
-            set -e
-            cd ~/gitee_go/deploy
-            rm -rf repo-fe || true
-            mkdir -p repo-fe
-            tar -xzf deploy-bundle.tar.gz -C repo-fe
-            cd repo-fe
+  - stage: 
+    name: deploy_frontend
+    displayName: deploy_frontend（K8S 发布部署）
+    strategy: naturally
+    trigger: auto
+    steps:
+      - step: deploy@agent
+        name: deploy_k8s_frontend_agent
+        displayName: 主机部署（frontend docker build + kubectl apply）
+        hostGroupID: ${HOST_GROUP_ID}
+        deployArtifact:
+          - source: build
+            name: deploy-bundle
+            target: ~/gitee_go/deploy
+            dependArtifact: deploy-bundle
+        script: |
+          set -e
+          cd ~/gitee_go/deploy
+          rm -rf repo-fe || true
+          mkdir -p repo-fe
+          tar -xzf deploy-bundle.tar.gz -C repo-fe
+          cd repo-fe
 
-            NAMESPACE="${K8S_NAMESPACE:-warehouse}"
-            K8S_DIR="${K8S_DIR:-/home/k8s}"
-            FE_IMAGE="warehouse-frontend:build.${GITEE_PIPELINE_BUILD_NUMBER}"
+          NAMESPACE="${K8S_NAMESPACE:-warehouse}"
+          K8S_DIR="${K8S_DIR:-/home/k8s}"
+          FE_IMAGE="warehouse-frontend:build.${GITEE_PIPELINE_BUILD_NUMBER}"
 
-            FE_DIR="./src/main/resources/admin/admin"
+          FE_DIR="./src/main/resources/admin/admin"
 
-            cat > "${FE_DIR}/Dockerfile.ci.frontend" <<'EOF'
-            ARG BASE_NODE_IMAGE=node:18-alpine
-            ARG BASE_NGINX_IMAGE=nginx:1.25-alpine
+          cat > "${FE_DIR}/Dockerfile.ci.frontend" <<'EOF'
+          ARG BASE_NODE_IMAGE=node:18-alpine
+          ARG BASE_NGINX_IMAGE=nginx:1.25-alpine
 
-            FROM ${BASE_NODE_IMAGE} AS build
-            WORKDIR /app
+          FROM ${BASE_NODE_IMAGE} AS build
+          WORKDIR /app
 
-            COPY package.json package-lock.json ./
-            RUN npm ci
+          COPY package.json package-lock.json ./
+          RUN npm ci
 
-            COPY . .
-            RUN node ./node_modules/@vue/cli-service/bin/vue-cli-service.js build
+          COPY . .
+          RUN node ./node_modules/@vue/cli-service/bin/vue-cli-service.js build
 
-            FROM ${BASE_NGINX_IMAGE}
-            COPY nginx.conf /etc/nginx/conf.d/default.conf
-            COPY --from=build /app/dist /usr/share/nginx/html
-            EXPOSE 80
-            EOF
+          FROM ${BASE_NGINX_IMAGE}
+          COPY nginx.conf /etc/nginx/conf.d/default.conf
+          COPY --from=build /app/dist /usr/share/nginx/html
+          EXPOSE 80
+          EOF
 
-            cat > "${FE_DIR}/nginx.conf" <<'EOF'
-            server {
-              listen 80;
-              server_name _;
+          cat > "${FE_DIR}/nginx.conf" <<'EOF'
+          server {
+            listen 80;
+            server_name _;
 
-              root /usr/share/nginx/html;
-              index index.html;
+            root /usr/share/nginx/html;
+            index index.html;
 
-              location /springboot38hdw40x/ {
-                proxy_http_version 1.1;
-                proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header X-Forwarded-Proto $scheme;
-                proxy_read_timeout 60s;
-                proxy_connect_timeout 5s;
-                proxy_send_timeout 60s;
+            location /springboot38hdw40x/ {
+              proxy_http_version 1.1;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+              proxy_read_timeout 60s;
+              proxy_connect_timeout 5s;
+              proxy_send_timeout 60s;
 
-                proxy_pass http://warehouse-app:8080;
-              }
-
-              location / {
-                try_files $uri $uri/ /index.html;
-              }
+              proxy_pass http://warehouse-app:8080;
             }
-            EOF
 
-            echo "== Build frontend image on target host =="
-            docker build -f "${FE_DIR}/Dockerfile.ci.frontend" -t "${FE_IMAGE}" "${FE_DIR}"
+            location / {
+              try_files $uri $uri/ /index.html;
+            }
+          }
+          EOF
 
-            echo "== Apply namespace (from ${K8S_DIR}) =="
-            kubectl apply -f "${K8S_DIR}/namespace.yaml"
+          echo "== Build frontend image on target host =="
+          docker build -f "${FE_DIR}/Dockerfile.ci.frontend" -t "${FE_IMAGE}" "${FE_DIR}"
 
-            echo "== Update image in ${K8S_DIR}/frontend.yaml =="
-            sed -i "s|^\\([[:space:]]*image:[[:space:]]*\\)warehouse-frontend:.*$|\\1${FE_IMAGE}|g" "${K8S_DIR}/frontend.yaml"
+          echo "== Apply namespace (from ${K8S_DIR}) =="
+          kubectl apply -f "${K8S_DIR}/namespace.yaml"
 
-            echo "== Apply frontend manifests (from ${K8S_DIR}) =="
-            kubectl apply -f "${K8S_DIR}/frontend.yaml"
+          echo "== Update image in ${K8S_DIR}/frontend.yaml =="
+          sed -i "s|^\\([[:space:]]*image:[[:space:]]*\\)warehouse-frontend:.*$|\\1${FE_IMAGE}|g" "${K8S_DIR}/frontend.yaml"
 
-            echo "== Rollout status =="
-            kubectl -n "${NAMESPACE}" rollout status deploy/warehouse-frontend --timeout=180s
+          echo "== Apply frontend manifests (from ${K8S_DIR}) =="
+          kubectl apply -f "${K8S_DIR}/frontend.yaml"
+
+          echo "== Rollout status =="
+          kubectl -n "${NAMESPACE}" rollout status deploy/warehouse-frontend --timeout=180s
 
 triggers:
   push:
