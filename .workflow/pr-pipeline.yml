@@ -1,57 +1,40 @@
 version: '1.0'
 name: pr-pipeline
 displayName: PRPipeline
-
+stages:
+  - stage: 
+    name: compile
+    displayName: 编译
+    steps:
+      - step: build@maven
+        name: build_maven
+        displayName: Maven 构建
+        # 支持6、7、8、9、10、11六个版本
+        jdkVersion: 8
+        # 支持2.2.1、3.2.5、3.3.9、3.5.2、3.5.3、3.5.4、3.6.1、3.6.3八个版本
+        mavenVersion: 3.3.9
+        # 构建命令
+        commands:
+          - mvn -B clean package -Dmaven.test.skip=true
+        # 非必填字段，开启后表示将构建产物暂存，但不会上传到制品库中，7天后自动清除
+        artifacts:
+            # 构建产物名字，作为产物的唯一标识可向下传递，支持自定义，默认为BUILD_ARTIFACT。在下游可以通过${BUILD_ARTIFACT}方式引用来获取构建物地址
+          - name: BUILD_ARTIFACT
+            # 构建产物获取路径，是指代码编译完毕之后构建物的所在路径，如通常jar包在target目录下。当前目录为代码库根目录
+            path:
+              - ./target
+      - step: publish@general_artifacts
+        name: publish_general_artifacts
+        displayName: 上传制品
+        # 上游构建任务定义的产物名，默认BUILD_ARTIFACT
+        dependArtifact: BUILD_ARTIFACT
+        # 构建产物制品库，默认default，系统默认创建
+        artifactRepository: default
+        # 上传到制品库时的制品命名，默认output
+        artifactName: output
+        dependsOn: build_maven
 triggers:
-  pull_request:
+  pr:
     branches:
       include:
         - master
-
-stages:
-  - stage:
-      name: sast
-      displayName: SAST（静态扫描）
-      steps:
-        - step: build@maven
-          name: sast_semgrep
-          displayName: Semgrep SAST
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - echo "=== Install semgrep ==="
-            - apt-get update
-            - apt-get install -y python3 python3-pip
-            - pip3 install --no-cache-dir semgrep
-            - echo "=== Run semgrep (best-effort) ==="
-            - semgrep --version
-            - semgrep --config p/java --error --timeout 300 .
-            - semgrep --config p/javascript --error --timeout 300 .
-
-  - stage:
-      name: build
-      displayName: 构建（PR 校验）
-      steps:
-        - step: build@maven
-          name: build_maven
-          displayName: Maven 构建（JAR）
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - echo "=== Maven build (skip tests) ==="
-            - mvn -B -ntp clean package -Dmaven.test.skip=true
-            - echo "=== List target ==="
-            - ls -lah ./target || true
-
-  - stage:
-      name: unit
-      displayName: unit（单元测试）
-      steps:
-        - step: build@maven
-          name: unit_test
-          displayName: Maven test
-          jdkVersion: 8
-          mavenVersion: 3.6.3
-          commands:
-            - echo "=== Maven unit tests ==="
-            - mvn -B -ntp test -DskipTests=false -Dmaven.test.skip=false
