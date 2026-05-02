@@ -7,7 +7,11 @@
 # Repo → Settings → Secrets and variables → Actions → Secrets:
 #   ALIYUN_HOST     — ECS IP / domain
 #   ALIYUN_USER     — SSH user
-#   ALIYUN_SSH_KEY  — Private key (PEM)
+#   ALIYUN_SSH_KEY  — Full PRIVATE key text (the file without .pub). Must include header/footer lines, e.g.
+#                     -----BEGIN OPENSSH PRIVATE KEY----- ... -----END OPENSSH PRIVATE KEY-----
+#                     or -----BEGIN RSA PRIVATE KEY----- ... -----END RSA PRIVATE KEY-----
+#                     Do not paste the .pub line; no extra quotes. If the key has a passphrase, add optional secret
+#                     ALIYUN_SSH_KEY_PASSPHRASE and set passphrase below.
 # Variables (optional):
 #   ALIYUN_DEPLOY_PATH — clone path on server (default /opt/deploy/warehouse-management-project)
 #   K8S_DIR            — manifests dir (default <DEPLOY_PATH>/k8s from repo); use /opt/k8s if you keep copies only on server
@@ -53,8 +57,8 @@ jobs:
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
           key: ${{ secrets.ALIYUN_SSH_KEY }}
+          passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
-          script_stop: true
           envs: GITHUB_RUN_NUMBER,GITHUB_SHA,DEPLOY_PATH,K8S_DIR,NAMESPACE
           script: |
             set -euo pipefail
