@@ -252,24 +252,65 @@ jobs:
           python3 << 'PY'
           import json
           from pathlib import Path
+
+          def point_value(obj):
+              """k6 NDJSON: legacy uses metric_value; newer uses data.value or top-level value."""
+              if "metric_value" in obj:
+                  try:
+                      return float(obj["metric_value"])
+                  except (TypeError, ValueError):
+                      return None
+              if "value" in obj:
+                  try:
+                      return float(obj["value"])
+                  except (TypeError, ValueError):
+                      return None
+              data = obj.get("data")
+              if isinstance(data, dict) and "value" in data:
+                  try:
+                      return float(data["value"])
+                  except (TypeError, ValueError):
+                      return None
+              return None
+
           p = Path('perf-artifacts/k6/raw.json')
-          lines = [json.loads(l) for l in p.read_text(encoding='utf-8', errors='ignore').splitlines() if l.strip()]
-          samples = [float(x['metric_value']) for x in lines if x.get('type')=='Point' and x.get('metric')=='http_req_duration']
-          failed = [x for x in lines if x.get('type')=='Point' and x.get('metric')=='http_req_failed' and float(x.get('metric_value',0))>0]
+          lines = []
+          for l in p.read_text(encoding='utf-8', errors='ignore').splitlines():
+              if not l.strip():
+                  continue
+              try:
+                  lines.append(json.loads(l))
+              except json.JSONDecodeError:
+                  continue
+
+          samples = []
+          failed_n = 0
+          for x in lines:
+              if x.get("type") != "Point":
+                  continue
+              m = x.get("metric")
+              v = point_value(x)
+              if v is None:
+                  continue
+              if m == "http_req_duration":
+                  samples.append(v)
+              elif m == "http_req_failed" and v > 0:
+                  failed_n += 1
+
           out = Path('perf-artifacts/k6/summary.txt')
           out.parent.mkdir(parents=True, exist_ok=True)
           if samples:
               s = sorted(samples)
               def pct(q):
-                  idx = int(round((len(s)-1)*q))
-                  return s[max(0, min(len(s)-1, idx))]
+                  idx = int(round((len(s) - 1) * q))
+                  return s[max(0, min(len(s) - 1, idx))]
               out.write_text(
                   "k6 http_req_duration samples: %d\n" % len(samples)
-                  + "avg=%.2f ms\n" % (sum(samples)/len(samples))
+                  + "avg=%.2f ms\n" % (sum(samples) / len(samples))
                   + "p50=%.2f ms\n" % pct(0.50)
                   + "p95=%.2f ms\n" % pct(0.95)
                   + "max=%.2f ms\n" % max(samples)
-                  + "http_req_failed_points=%d\n" % len(failed),
+                  + "http_req_failed_points=%d\n" % failed_n,
                   encoding='utf-8'
               )
           else:
