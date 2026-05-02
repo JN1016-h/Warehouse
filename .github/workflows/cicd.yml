@@ -1,7 +1,9 @@
 # Matches GitHub Actions layout: sidebar jobs sast → unit → integration → container_iac_scan → dast → performance,
 # with performance steps aligned to the reference diagram (k6 + JMeter + artifacts).
 #
-# Production (K8s NodePort): frontend http://47.103.133.105:30080/ — backend http://47.103.133.105:30081/
+# Production (K8s NodePort): defaults frontend http://HOST:30080/ — backend http://HOST:30081/
+# Override in Repo → Settings → Secrets and variables → Actions → Variables:
+#   PRODUCTION_HOST, PRODUCTION_FRONTEND_NODEPORT, PRODUCTION_BACKEND_NODEPORT
 # On the cluster/deploy host, manifests are applied from: /opt/k8s/app.yaml and /opt/k8s/frontend.yaml
 # (see repo k8s/*.yaml; Gitee pipeline default K8S_DIR is /opt/k8s).
 name: Cicd
@@ -18,11 +20,12 @@ permissions:
 
 env:
   IMAGE: warehouse-app:ci-${{ github.sha }}
-  APP_HEALTH_URL: http://47.103.133.105:30081/springboot38hdw40x/config/list?page=1&limit=1
+  APP_HEALTH_URL: "http://${{ vars.PRODUCTION_HOST || '47.103.133.105' }}:${{ vars.PRODUCTION_BACKEND_NODEPORT || '30081' }}/springboot38hdw40x/config/list?page=1&limit=1"
+  # Backend listens on 8080 inside the CI Docker image (--network host on runner). Not production NodePort 30081.
   CI_LOCAL_HEALTH_URL: http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=1
   CI_LOCAL_APP_BASE: http://127.0.0.1:8080/springboot38hdw40x
-  PRODUCTION_FRONTEND_URL: http://47.103.133.105:30080
-  PRODUCTION_BACKEND_URL: http://47.103.133.105:30081
+  PRODUCTION_FRONTEND_URL: "http://${{ vars.PRODUCTION_HOST || '47.103.133.105' }}:${{ vars.PRODUCTION_FRONTEND_NODEPORT || '30080' }}"
+  PRODUCTION_BACKEND_URL: "http://${{ vars.PRODUCTION_HOST || '47.103.133.105' }}:${{ vars.PRODUCTION_BACKEND_NODEPORT || '30081' }}"
   K8S_REMOTE_MANIFEST_DIR: /opt/k8s
 
 jobs:
@@ -144,6 +147,9 @@ jobs:
     name: performance
     needs: dast
     runs-on: ubuntu-latest
+    env:
+      JMETER_SRC_HOST: ${{ vars.PRODUCTION_HOST || '47.103.133.105' }}
+      JMETER_SRC_PORT: ${{ vars.PRODUCTION_BACKEND_NODEPORT || '30081' }}
     steps:
       - name: Set up job
         run: |
@@ -235,8 +241,8 @@ jobs:
         run: |
           mkdir -p tests/jmeter/output perf-artifacts/jmeter
           cp tests/jmeter/warehouse-load.jmx /tmp/warehouse-load.ci.jmx
-          sed -i 's#<stringProp name="HTTPSampler.domain">47.103.133.105</stringProp>#<stringProp name="HTTPSampler.domain">127.0.0.1</stringProp>#g' /tmp/warehouse-load.ci.jmx
-          sed -i 's#<stringProp name="HTTPSampler.port">30081</stringProp>#<stringProp name="HTTPSampler.port">8080</stringProp>#g' /tmp/warehouse-load.ci.jmx
+          sed -i "s#<stringProp name=\"HTTPSampler.domain\">${JMETER_SRC_HOST}</stringProp>#<stringProp name=\"HTTPSampler.domain\">127.0.0.1</stringProp>#g" /tmp/warehouse-load.ci.jmx
+          sed -i "s#<stringProp name=\"HTTPSampler.port\">${JMETER_SRC_PORT}</stringProp>#<stringProp name=\"HTTPSampler.port\">8080</stringProp>#g" /tmp/warehouse-load.ci.jmx
           jmeter -n -t /tmp/warehouse-load.ci.jmx \
             -l tests/jmeter/output/result.jtl \
             -j tests/jmeter/output/jmeter.log \
