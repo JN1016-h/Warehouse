@@ -1,0 +1,79 @@
+# Deploy to Alibaba Cloud ECS after CI passes (GitHub runner SSH → ECS).
+#
+# On ECS: install git, docker, kubectl; clone this repo; put K8s YAML under /opt/k8s/
+# Security group: open SSH (22) from your IP or use a self-hosted runner on ECS instead.
+#
+# Repo → Settings → Secrets and variables → Actions → Secrets:
+#   ALIYUN_HOST     — ECS IP / domain
+#   ALIYUN_USER     — SSH user
+#   ALIYUN_SSH_KEY  — Private key (PEM)
+# Variables (optional):
+#   ALIYUN_DEPLOY_PATH — clone path on server (default /opt/deploy/warehouse-management-project)
+#   K8S_DIR            — manifests dir (default <DEPLOY_PATH>/k8s from repo); use /opt/k8s if you keep copies only on server
+#   K8S_NAMESPACE      — default warehouse
+#   ALIYUN_SSH_PORT    — default 22
+#
+# Self-hosted runner (alternative): install runner on ECS, then use runs-on: [self-hosted] in a job.
+name: Deploy Aliyun
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: [Cicd]
+    types: [completed]
+    branches: [master]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: deploy-aliyun-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy_aliyun_ssh
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'master')
+    steps:
+      - name: Deploy via SSH (docker build + kubectl)
+        uses: appleboy/ssh-action@v1.2.1
+        env:
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          GITHUB_SHA: ${{ github.sha }}
+          DEPLOY_PATH: ${{ vars.ALIYUN_DEPLOY_PATH }}
+          K8S_DIR: ${{ vars.K8S_DIR }}
+          NAMESPACE: ${{ vars.K8S_NAMESPACE }}
+        with:
+          host: ${{ secrets.ALIYUN_HOST }}
+          username: ${{ secrets.ALIYUN_USER }}
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
+          port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
+          script_stop: true
+          envs: GITHUB_RUN_NUMBER,GITHUB_SHA,DEPLOY_PATH,K8S_DIR,NAMESPACE
+          script: |
+            set -euo pipefail
+            DP="${DEPLOY_PATH:-/opt/deploy/warehouse-management-project}"
+            KD="${K8S_DIR:-${DP}/k8s}"
+            NS="${NAMESPACE:-warehouse}"
+            echo "== path=${DP} k8s=${KD} ns=${NS}"
+            cd "$DP"
+            git fetch origin
+            git checkout master
+            git reset --hard origin/master
+            IMAGE="warehouse-app:build.${GITHUB_RUN_NUMBER}"
+            FE_IMAGE="warehouse-frontend:build.${GITHUB_RUN_NUMBER}"
+            docker build -t "${IMAGE}" -f ./Dockerfile .
+            kubectl apply -f "${KD}/namespace.yaml"
+            kubectl apply -f "${KD}/app.yaml"
+            kubectl set image "deployment/warehouse-app" "app=${IMAGE}" -n "${NS}" --record
+            kubectl rollout status "deployment/warehouse-app" -n "${NS}" --timeout=300s || true
+            docker build -f deploy/frontend-ci.Dockerfile -t "${FE_IMAGE}" .
+            kubectl apply -f "${KD}/frontend.yaml"
+            kubectl set image "deployment/warehouse-frontend" "frontend=${FE_IMAGE}" -n "${NS}" --record
+            kubectl rollout status "deployment/warehouse-frontend" -n "${NS}" --timeout=300s || true
+            echo "== done ${GITHUB_SHA}"
