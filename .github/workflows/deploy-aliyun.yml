@@ -45,6 +45,20 @@ jobs:
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.head_branch == 'master')
     steps:
+      # Multiline repo secrets are safer via env → file than passing raw `key:` (avoids ParsePrivateKey / empty key).
+      - name: Write SSH private key
+        run: |
+          f="$RUNNER_TEMP/deploy_ssh_key"
+          umask 077
+          echo "$SSH_PRIVATE_KEY" > "$f"
+          bytes=$(wc -c < "$f" | tr -d ' ')
+          if [ "${bytes:-0}" -lt 80 ]; then
+            echo "::error::ALIYUN_SSH_KEY is empty or too short. Use the PRIVATE key file contents (with BEGIN/END lines), not the .pub line."
+            exit 1
+          fi
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
+
       - name: Deploy via SSH (docker build + kubectl)
         uses: appleboy/ssh-action@v1.2.1
         env:
@@ -56,7 +70,7 @@ jobs:
         with:
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
-          key: ${{ secrets.ALIYUN_SSH_KEY }}
+          key_path: ${{ runner.temp }}/deploy_ssh_key
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
           envs: GITHUB_RUN_NUMBER,GITHUB_SHA,DEPLOY_PATH,K8S_DIR,NAMESPACE
