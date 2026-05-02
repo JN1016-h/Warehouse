@@ -1,7 +1,8 @@
 # Deploy to Alibaba Cloud ECS after CI passes (GitHub runner SSH → ECS).
 #
 # On ECS: install git, docker, kubectl; clone this repo; put K8s YAML under /opt/k8s/
-# Security group: open SSH (22) from your IP or use a self-hosted runner on ECS instead.
+# Security group: SSH (22) must be reachable from the runner. GitHub-hosted runners use changing IPs —
+# if SSH fails quickly, allow temporary 0.0.0.0/0:22 for testing, use a bastion, or a self-hosted runner on ECS.
 #
 # Repo → Settings → Secrets and variables → Actions → Secrets:
 #   ALIYUN_HOST     — ECS IP / domain
@@ -61,6 +62,17 @@ jobs:
             KD="${K8S_DIR:-${DP}/k8s}"
             NS="${NAMESPACE:-warehouse}"
             echo "== path=${DP} k8s=${KD} ns=${NS}"
+            if [ ! -d "$DP" ]; then
+              echo "ERROR: deploy directory missing: ${DP}"
+              echo "On ECS: sudo mkdir -p \"$(dirname "$DP")\" && sudo git clone <your-repo-url> \"$DP\""
+              exit 1
+            fi
+            if [ ! -e "$DP/.git" ]; then
+              echo "ERROR: not a git repo: ${DP}"
+              exit 1
+            fi
+            if ! command -v docker >/dev/null 2>&1; then echo "ERROR: docker not in PATH"; exit 1; fi
+            if ! command -v kubectl >/dev/null 2>&1; then echo "ERROR: kubectl not in PATH"; exit 1; fi
             cd "$DP"
             git fetch origin
             git checkout master
