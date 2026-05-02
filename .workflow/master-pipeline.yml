@@ -1,10 +1,10 @@
 version: '1.0'
 name: master-pipeline
-displayName: Continuous Integration
+displayName: Cicd
 stages:
   - stage: 
     name: sast
-    displayName: SAST（静态扫描）
+    displayName: sast
     strategy: naturally
     trigger: auto
     steps:
@@ -74,7 +74,7 @@ stages:
 
   - stage: 
     name: unit
-    displayName: unit（单元测试）
+    displayName: unit
     strategy: naturally
     trigger: auto
     steps:
@@ -89,7 +89,7 @@ stages:
 
   - stage: 
     name: integration
-    displayName: integration（集成测试）
+    displayName: integration
     strategy: naturally
     trigger: auto
     steps:
@@ -123,7 +123,7 @@ stages:
 
   - stage: 
     name: container_iac_scan
-    displayName: container_iac_scan（镜像&配置扫描）
+    displayName: container_iac_scan
     strategy: naturally
     trigger: auto
     steps:
@@ -147,7 +147,7 @@ stages:
 
   - stage: 
     name: dast
-    displayName: dast（动态扫描）
+    displayName: dast
     strategy: naturally
     trigger: auto
     steps:
@@ -172,30 +172,47 @@ stages:
 
   - stage: 
     name: performance
-    displayName: performance（性能测试）
+    displayName: performance
     strategy: naturally
     trigger: auto
     steps:
       - step: build@maven
-        name: perf_prepare
-        displayName: Set up job / Checkout / Launch perf env / Wait
+        name: perf_setup
+        displayName: Set up job
         jdkVersion: 8
         mavenVersion: 3.6.3
         commands:
-          - echo "Set up job"
           - mkdir -p perf-artifacts/jmeter perf-artifacts/k6 tests/jmeter/output
           - docker --version
 
-          - echo "Checkout code"
+      - step: build@maven
+        name: perf_checkout
+        displayName: Checkout code
+        dependsOn: perf_setup
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
           - pwd
           - ls -lah
 
+      - step: build@maven
+        name: perf_launch
+        displayName: Launch perf env (gunicorn)
+        dependsOn: perf_checkout
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
           - IMAGE="warehouse-app:build.${GITEE_PIPELINE_BUILD_NUMBER}"
-          - echo "Launch perf env (gunicorn)"
           - docker rm -f warehouse-app-ci || true
           - docker run -d --name warehouse-app-ci --network host -e "JAVA_OPTS=-Xms256m -Xmx512m" "${IMAGE}"
 
-          - echo "Wait for services to be ready"
+      - step: build@maven
+        name: perf_wait
+        displayName: Wait for services to be ready
+        dependsOn: perf_launch
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
           - apt-get update
           - apt-get install -y curl ca-certificates
           - for i in $(seq 1 60); do curl -fsS "http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=1" && break || true; sleep 2; done
@@ -212,7 +229,7 @@ stages:
           - tar -C /tmp -xzf /tmp/k6.tgz
           - install -m 0755 /tmp/k6-v0.49.0-linux-amd64/k6 /usr/local/bin/k6
           - k6 version
-        dependsOn: perf_prepare
+        dependsOn: perf_wait
 
       - step: build@maven
         name: perf_k6_verify
@@ -281,26 +298,6 @@ stages:
         dependsOn: perf_k6_run
 
       - step: build@maven
-        name: perf_k6_upload_prep
-        displayName: Upload k6 artifacts (prepare)
-        jdkVersion: 8
-        mavenVersion: 3.6.3
-        commands:
-          - tar -czf perf-artifacts/k6.tgz perf-artifacts/k6 || true
-        artifacts:
-          - name: K6_ARTIFACTS
-            path:
-              - ./perf-artifacts/k6.tgz
-        dependsOn: perf_k6_summary
-
-      - step: publish@general_artifacts
-        name: perf_publish_k6
-        displayName: Upload k6 artifacts
-        dependArtifact: K6_ARTIFACTS
-        artifactName: k6-output
-        dependsOn: perf_k6_upload_prep
-
-      - step: build@maven
         name: perf_jmeter_install
         displayName: Install JMeter
         jdkVersion: 8
@@ -314,7 +311,7 @@ stages:
           - export JMETER_HOME="/opt/apache-jmeter-${JMETER_VER}"
           - export PATH="$JMETER_HOME/bin:$PATH"
           - jmeter -v
-        dependsOn: perf_prepare
+        dependsOn: perf_k6_summary
 
       - step: build@maven
         name: perf_jmeter_security
@@ -349,36 +346,10 @@ stages:
           - export PATH="$JMETER_HOME/bin:$PATH"
           - mkdir -p tests/jmeter/output perf-artifacts/jmeter
           - cp tests/jmeter/warehouse-load.jmx /tmp/warehouse-load.ci.jmx
-          - sed -i 's/<stringProp name="HTTPSampler.domain">47.103.133.105<\\/stringProp>/<stringProp name="HTTPSampler.domain">127.0.0.1<\\/stringProp>/g' /tmp/warehouse-load.ci.jmx
-          - sed -i 's/<stringProp name="HTTPSampler.port">30081<\\/stringProp>/<stringProp name="HTTPSampler.port">8080<\\/stringProp>/g' /tmp/warehouse-load.ci.jmx
+          - sed -i 's#<stringProp name="HTTPSampler.domain">47.103.133.105</stringProp>#<stringProp name="HTTPSampler.domain">127.0.0.1</stringProp>#g' /tmp/warehouse-load.ci.jmx
+          - sed -i 's#<stringProp name="HTTPSampler.port">30081</stringProp>#<stringProp name="HTTPSampler.port">8080</stringProp>#g' /tmp/warehouse-load.ci.jmx
           - jmeter -n -t /tmp/warehouse-load.ci.jmx -l tests/jmeter/output/result.jtl -j tests/jmeter/output/jmeter.log -q /tmp/jmeter-user.properties
         dependsOn: perf_jmeter_security
-
-      - step: build@maven
-        name: perf_jmeter_report
-        displayName: Generate JMeter HTML report
-        jdkVersion: 8
-        mavenVersion: 3.6.3
-        commands:
-          - |
-            JMETER_VER=5.6.3
-            export JMETER_HOME="/opt/apache-jmeter-${JMETER_VER}"
-            export PATH="$JMETER_HOME/bin:$PATH"
-            if ! command -v jmeter >/dev/null 2>&1; then
-              apt-get update
-              apt-get install -y ca-certificates curl tar
-              curl -fsSL -o /tmp/jmeter.tgz "https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-${JMETER_VER}.tgz"
-              tar -C /opt -xzf /tmp/jmeter.tgz
-              export JMETER_HOME="/opt/apache-jmeter-${JMETER_VER}"
-              export PATH="$JMETER_HOME/bin:$PATH"
-            fi
-            jmeter -v
-          - JMETER_VER=5.6.3
-          - export JMETER_HOME="/opt/apache-jmeter-${JMETER_VER}"
-          - export PATH="$JMETER_HOME/bin:$PATH"
-          - rm -rf tests/jmeter/output/html-report || true
-          - jmeter -g tests/jmeter/output/result.jtl -o tests/jmeter/output/html-report
-        dependsOn: perf_jmeter_run
 
       - step: build@maven
         name: perf_jmeter_summary
@@ -419,11 +390,42 @@ stages:
               encoding='utf-8'
             )
           PY
-        dependsOn: perf_jmeter_report
+        dependsOn: perf_jmeter_run
+
+      - step: build@maven
+        name: perf_list_files
+        displayName: List generated files
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - ls -lah perf-artifacts/k6 || true
+          - ls -lah perf-artifacts/jmeter || true
+          - ls -lah tests/jmeter/output || true
+        dependsOn: perf_jmeter_summary
+
+      - step: build@maven
+        name: perf_k6_upload_prep
+        displayName: Prepare k6 artifact tarball
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
+          - tar -czf perf-artifacts/k6.tgz perf-artifacts/k6 || true
+        artifacts:
+          - name: K6_ARTIFACTS
+            path:
+              - ./perf-artifacts/k6.tgz
+        dependsOn: perf_list_files
+
+      - step: publish@general_artifacts
+        name: perf_publish_k6
+        displayName: Upload k6 artifacts
+        dependArtifact: K6_ARTIFACTS
+        artifactName: k6-output
+        dependsOn: perf_k6_upload_prep
 
       - step: build@maven
         name: perf_jmeter_upload_prep
-        displayName: Upload JMeter artifacts (prepare)
+        displayName: Prepare JMeter artifact tarball
         jdkVersion: 8
         mavenVersion: 3.6.3
         commands:
@@ -432,7 +434,7 @@ stages:
           - name: JMETER_ARTIFACTS
             path:
               - ./perf-artifacts/jmeter.tgz
-        dependsOn: perf_jmeter_summary
+        dependsOn: perf_publish_k6
 
       - step: publish@general_artifacts
         name: perf_publish_jmeter
@@ -442,40 +444,22 @@ stages:
         dependsOn: perf_jmeter_upload_prep
 
       - step: build@maven
-        name: perf_finalize
-        displayName: List generated files / teardown / pack bundle
+        name: perf_post_checkout
+        displayName: Post Checkout code
         jdkVersion: 8
         mavenVersion: 3.6.3
         commands:
-          - echo "List generated files"
-          - ls -lah perf-artifacts/k6 || true
-          - ls -lah perf-artifacts/jmeter || true
-          - ls -lah tests/jmeter/output || true
-
           - echo "Post Checkout code"
-          - echo "(noop)"
+        dependsOn: perf_publish_jmeter
 
-          - echo "Complete job"
+      - step: build@maven
+        name: perf_complete
+        displayName: Complete job
+        jdkVersion: 8
+        mavenVersion: 3.6.3
+        commands:
           - docker rm -f warehouse-app-ci || true
-
-          - echo "Pack perf artifacts"
-          - apt-get update
-          - apt-get install -y tar
-          - tar -czf perf-artifacts.tgz perf-artifacts/k6.tgz perf-artifacts/jmeter.tgz || true
-        artifacts:
-          - name: PERF_ARTIFACTS
-            path:
-              - ./perf-artifacts.tgz
-        dependsOn:
-          - perf_publish_k6
-          - perf_publish_jmeter
-
-      - step: publish@general_artifacts
-        name: perf_publish_bundle
-        displayName: Upload combined perf bundle
-        dependArtifact: PERF_ARTIFACTS
-        artifactName: perf-bundle
-        dependsOn: perf_finalize
+        dependsOn: perf_post_checkout
 
   - stage: 
     name: deploy
