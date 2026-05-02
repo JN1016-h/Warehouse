@@ -18,7 +18,9 @@ permissions:
 
 env:
   IMAGE: warehouse-app:ci-${{ github.sha }}
-  APP_HEALTH_URL: http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=1
+  APP_HEALTH_URL: http://47.103.133.105:30081/springboot38hdw40x/config/list?page=1&limit=1
+  CI_LOCAL_HEALTH_URL: http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=1
+  CI_LOCAL_APP_BASE: http://127.0.0.1:8080/springboot38hdw40x
   PRODUCTION_FRONTEND_URL: http://47.103.133.105:30080
   PRODUCTION_BACKEND_URL: http://47.103.133.105:30081
   K8S_REMOTE_MANIFEST_DIR: /opt/k8s
@@ -113,7 +115,7 @@ jobs:
       - name: Wait for app to be ready
         run: |
           for i in $(seq 1 60); do
-            curl -fsS "${{ env.APP_HEALTH_URL }}" && exit 0
+            curl -fsS "${{ env.CI_LOCAL_HEALTH_URL }}" && exit 0
             sleep 2
           done
           exit 1
@@ -124,7 +126,7 @@ jobs:
             -v "$GITHUB_WORKSPACE:/zap/wrk:rw" \
             owasp/zap2docker-stable \
             zap-baseline.py \
-            -t "${{ env.APP_HEALTH_URL }}" \
+            -t "${{ env.CI_LOCAL_HEALTH_URL }}" \
             -r zap-report.html || true
           ls -lah zap-report.html || true
 
@@ -156,7 +158,7 @@ jobs:
       - name: Wait for services to be ready
         run: |
           for i in $(seq 1 60); do
-            curl -fsS "${{ env.APP_HEALTH_URL }}" && exit 0
+            curl -fsS "${{ env.CI_LOCAL_HEALTH_URL }}" && exit 0
             sleep 2
           done
           exit 1
@@ -169,13 +171,13 @@ jobs:
           k6 version
 
       - name: Verify target endpoint before k6 test
-        run: curl -fsS "http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=5"
+        run: curl -fsS "${{ env.CI_LOCAL_APP_BASE }}/config/list?page=1&limit=5"
 
       - name: k6 load test
         run: |
           mkdir -p perf-artifacts/k6
           k6 run --out json=perf-artifacts/k6/raw.json \
-            -e BASE_URL="http://127.0.0.1:8080/springboot38hdw40x" \
+            -e BASE_URL="${{ env.CI_LOCAL_APP_BASE }}" \
             tests/k6/smoke.js
 
       - name: Generate k6 summary
@@ -314,7 +316,7 @@ jobs:
       - name: HTTP check production NodePorts (best-effort)
         run: |
           curl -fsS --connect-timeout 8 --max-time 15 \
-            "${{ env.PRODUCTION_BACKEND_URL }}/springboot38hdw40x/config/list?page=1&limit=1" \
+            "${{ env.APP_HEALTH_URL }}" \
             && echo "backend OK" || echo "backend unreachable from runner (expected if firewall / not deployed)"
           curl -fsS --connect-timeout 8 --max-time 15 \
             -o /dev/null -w "frontend HTTP %{http_code}\n" \
