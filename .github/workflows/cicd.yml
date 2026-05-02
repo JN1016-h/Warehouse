@@ -84,12 +84,13 @@ jobs:
       - name: Docker build (local)
         run: docker build -f ./Dockerfile -t "${{ env.IMAGE }}" .
 
-      # install.sh hits GitHub API and often fails in CI (rate limit / script changes). Use release tarball instead.
+      # Pin a release that still ships Linux-64bit.tar.gz (older tags like v0.53.0 may 404 → wget exit 8).
       - name: Install Trivy
         run: |
           set -euo pipefail
-          TRIVY_VERSION=0.53.0
-          wget -qO /tmp/trivy.tar.gz "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          TRIVY_VERSION=0.70.0
+          curl -fsSL -o /tmp/trivy.tar.gz \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
           sudo tar -xzf /tmp/trivy.tar.gz -C /usr/local/bin trivy
           sudo chmod 755 /usr/local/bin/trivy
           trivy --version
