@@ -21,9 +21,10 @@ permissions:
 env:
   IMAGE: warehouse-app:ci-${{ github.sha }}
   APP_HEALTH_URL: "http://${{ vars.PRODUCTION_HOST || '47.103.133.105' }}:${{ vars.PRODUCTION_BACKEND_NODEPORT || '30081' }}/springboot38hdw40x/config/list?page=1&limit=1"
-  # Backend listens on 8080 inside the CI Docker image (--network host on runner). Not production NodePort 30081.
+  # Local CI stack: app container publishes 8080; MySQL runs as mysql-ci on Docker network (see dast/performance jobs).
   CI_LOCAL_HEALTH_URL: http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=1
   CI_LOCAL_APP_BASE: http://127.0.0.1:8080/springboot38hdw40x
+  CI_MYSQL_IMAGE: mysql:8.0
   PRODUCTION_FRONTEND_URL: "http://${{ vars.PRODUCTION_HOST || '47.103.133.105' }}:${{ vars.PRODUCTION_FRONTEND_NODEPORT || '30080' }}"
   PRODUCTION_BACKEND_URL: "http://${{ vars.PRODUCTION_HOST || '47.103.133.105' }}:${{ vars.PRODUCTION_BACKEND_NODEPORT || '30081' }}"
   K8S_REMOTE_MANIFEST_DIR: /opt/k8s
@@ -114,11 +115,37 @@ jobs:
       - name: Docker build (local)
         run: docker build -f ./Dockerfile -t "${{ env.IMAGE }}" .
 
+      - name: Start MySQL for CI
+        run: |
+          set -euo pipefail
+          docker rm -f mysql-ci 2>/dev/null || true
+          docker network rm ci-app-net 2>/dev/null || true
+          docker network create ci-app-net
+          docker run -d --name mysql-ci --network ci-app-net \
+            -e MYSQL_ROOT_PASSWORD=123123 \
+            -e MYSQL_DATABASE=springboot38hdw40x \
+            -v "$GITHUB_WORKSPACE/db/springboot38hdw40x.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro" \
+            "${{ env.CI_MYSQL_IMAGE }}"
+          for i in $(seq 1 90); do
+            if docker exec mysql-ci mysqladmin ping -h127.0.0.1 -uroot -p123123 --silent 2>/dev/null; then
+              echo "mysql ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "mysql did not become ready in time"
+          docker logs mysql-ci --tail 80 || true
+          exit 1
+
       - name: Run app for ZAP
         run: |
           docker rm -f warehouse-app-ci 2>/dev/null || true
-          docker run -d --name warehouse-app-ci --network host \
+          docker run -d --name warehouse-app-ci --network ci-app-net \
+            -p 127.0.0.1:8080:8080 \
             -e JAVA_OPTS="-Xms256m -Xmx512m" \
+            -e SPRING_DATASOURCE_URL='jdbc:mysql://mysql-ci:3306/springboot38hdw40x?useUnicode=true&characterEncoding=utf-8&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true' \
+            -e SPRING_DATASOURCE_USERNAME=root \
+            -e SPRING_DATASOURCE_PASSWORD=123123 \
             "${{ env.IMAGE }}"
 
       - name: Wait for app to be ready
@@ -139,9 +166,11 @@ jobs:
             -r zap-report.html || true
           ls -lah zap-report.html || true
 
-      - name: Stop app container
+      - name: Stop CI containers
         if: always()
-        run: docker rm -f warehouse-app-ci 2>/dev/null || true
+        run: |
+          docker rm -f warehouse-app-ci mysql-ci 2>/dev/null || true
+          docker network rm ci-app-net 2>/dev/null || true
 
   performance:
     name: performance
@@ -159,12 +188,38 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Launch perf env (gunicorn)
+      - name: Start MySQL for CI
+        run: |
+          set -euo pipefail
+          docker rm -f mysql-ci 2>/dev/null || true
+          docker network rm ci-app-net 2>/dev/null || true
+          docker network create ci-app-net
+          docker run -d --name mysql-ci --network ci-app-net \
+            -e MYSQL_ROOT_PASSWORD=123123 \
+            -e MYSQL_DATABASE=springboot38hdw40x \
+            -v "$GITHUB_WORKSPACE/db/springboot38hdw40x.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro" \
+            "${{ env.CI_MYSQL_IMAGE }}"
+          for i in $(seq 1 90); do
+            if docker exec mysql-ci mysqladmin ping -h127.0.0.1 -uroot -p123123 --silent 2>/dev/null; then
+              echo "mysql ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "mysql did not become ready in time"
+          docker logs mysql-ci --tail 80 || true
+          exit 1
+
+      - name: Launch app for perf tests
         run: |
           docker build -f ./Dockerfile -t "${{ env.IMAGE }}" .
           docker rm -f warehouse-app-ci 2>/dev/null || true
-          docker run -d --name warehouse-app-ci --network host \
+          docker run -d --name warehouse-app-ci --network ci-app-net \
+            -p 127.0.0.1:8080:8080 \
             -e JAVA_OPTS="-Xms256m -Xmx512m" \
+            -e SPRING_DATASOURCE_URL='jdbc:mysql://mysql-ci:3306/springboot38hdw40x?useUnicode=true&characterEncoding=utf-8&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true' \
+            -e SPRING_DATASOURCE_USERNAME=root \
+            -e SPRING_DATASOURCE_PASSWORD=123123 \
             "${{ env.IMAGE }}"
 
       - name: Wait for services to be ready
@@ -311,7 +366,8 @@ jobs:
       - name: Complete job
         if: always()
         run: |
-          docker rm -f warehouse-app-ci 2>/dev/null || true
+          docker rm -f warehouse-app-ci mysql-ci 2>/dev/null || true
+          docker network rm ci-app-net 2>/dev/null || true
 
   production_smoke:
     name: production_smoke
