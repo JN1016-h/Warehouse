@@ -1,0 +1,293 @@
+# Matches GitHub Actions layout: sidebar jobs sast → unit → integration → container_iac_scan → dast → performance,
+# with performance steps aligned to the reference diagram (k6 + JMeter + artifacts).
+name: Cicd
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: warehouse-app:ci-${{ github.sha }}
+  APP_HEALTH_URL: http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=1
+
+jobs:
+  sast:
+    name: sast
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Semgrep
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip
+          python3 -m pip install --user semgrep
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Semgrep (Java)
+        run: semgrep --config p/java --error --timeout 300 .
+
+      - name: Semgrep (JavaScript)
+        run: semgrep --config p/javascript --error --timeout 300 .
+
+  unit:
+    name: unit
+    needs: sast
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "8"
+          cache: maven
+
+      - name: Maven unit tests
+        run: mvn -B -ntp test -DskipTests=false -Dmaven.test.skip=false
+
+  integration:
+    name: integration
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Integration smoke (placeholder)
+        run: |
+          echo "No dedicated IT yet; add tests under src/test or a dedicated IT profile when ready."
+
+  container_iac_scan:
+    name: container_iac_scan
+    needs: integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker build (local)
+        run: docker build -f ./Dockerfile -t "${{ env.IMAGE }}" .
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget
+          wget -qO - https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin v0.53.0
+          trivy --version
+
+      - name: Trivy filesystem scan
+        run: trivy fs --scanners vuln,config --exit-code 0 --timeout 10m .
+
+      - name: Trivy image scan
+        run: trivy image --exit-code 0 --timeout 15m "${{ env.IMAGE }}"
+
+  dast:
+    name: dast
+    needs: container_iac_scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker build (local)
+        run: docker build -f ./Dockerfile -t "${{ env.IMAGE }}" .
+
+      - name: Run app for ZAP
+        run: |
+          docker rm -f warehouse-app-ci 2>/dev/null || true
+          docker run -d --name warehouse-app-ci --network host \
+            -e JAVA_OPTS="-Xms256m -Xmx512m" \
+            "${{ env.IMAGE }}"
+
+      - name: Wait for app to be ready
+        run: |
+          for i in $(seq 1 60); do
+            curl -fsS "${{ env.APP_HEALTH_URL }}" && exit 0
+            sleep 2
+          done
+          exit 1
+
+      - name: OWASP ZAP baseline
+        run: |
+          docker run --rm --network host \
+            -v "$GITHUB_WORKSPACE:/zap/wrk:rw" \
+            owasp/zap2docker-stable \
+            zap-baseline.py \
+            -t "${{ env.APP_HEALTH_URL }}" \
+            -r zap-report.html || true
+          ls -lah zap-report.html || true
+
+      - name: Stop app container
+        if: always()
+        run: docker rm -f warehouse-app-ci 2>/dev/null || true
+
+  performance:
+    name: performance
+    needs: dast
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up job
+        run: |
+          mkdir -p perf-artifacts/jmeter perf-artifacts/k6 tests/jmeter/output
+          docker --version
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Launch perf env (gunicorn)
+        run: |
+          docker build -f ./Dockerfile -t "${{ env.IMAGE }}" .
+          docker rm -f warehouse-app-ci 2>/dev/null || true
+          docker run -d --name warehouse-app-ci --network host \
+            -e JAVA_OPTS="-Xms256m -Xmx512m" \
+            "${{ env.IMAGE }}"
+
+      - name: Wait for services to be ready
+        run: |
+          for i in $(seq 1 60); do
+            curl -fsS "${{ env.APP_HEALTH_URL }}" && exit 0
+            sleep 2
+          done
+          exit 1
+
+      - name: Install k6
+        run: |
+          curl -fsSL -o /tmp/k6.tgz https://github.com/grafana/k6/releases/download/v0.49.0/k6-v0.49.0-linux-amd64.tar.gz
+          sudo tar -C /tmp -xzf /tmp/k6.tgz
+          sudo install -m 0755 /tmp/k6-v0.49.0-linux-amd64/k6 /usr/local/bin/k6
+          k6 version
+
+      - name: Verify target endpoint before k6 test
+        run: curl -fsS "http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=5"
+
+      - name: k6 load test
+        run: |
+          mkdir -p perf-artifacts/k6
+          k6 run --out json=perf-artifacts/k6/raw.json \
+            -e BASE_URL="http://127.0.0.1:8080/springboot38hdw40x" \
+            tests/k6/smoke.js
+
+      - name: Generate k6 summary
+        run: |
+          python3 << 'PY'
+          import json
+          from pathlib import Path
+          p = Path('perf-artifacts/k6/raw.json')
+          lines = [json.loads(l) for l in p.read_text(encoding='utf-8', errors='ignore').splitlines() if l.strip()]
+          samples = [float(x['metric_value']) for x in lines if x.get('type')=='Point' and x.get('metric')=='http_req_duration']
+          failed = [x for x in lines if x.get('type')=='Point' and x.get('metric')=='http_req_failed' and float(x.get('metric_value',0))>0]
+          out = Path('perf-artifacts/k6/summary.txt')
+          out.parent.mkdir(parents=True, exist_ok=True)
+          if samples:
+              s = sorted(samples)
+              def pct(q):
+                  idx = int(round((len(s)-1)*q))
+                  return s[max(0, min(len(s)-1, idx))]
+              out.write_text(
+                  "k6 http_req_duration samples: %d\n" % len(samples)
+                  + "avg=%.2f ms\n" % (sum(samples)/len(samples))
+                  + "p50=%.2f ms\n" % pct(0.50)
+                  + "p95=%.2f ms\n" % pct(0.95)
+                  + "max=%.2f ms\n" % max(samples)
+                  + "http_req_failed_points=%d\n" % len(failed),
+                  encoding='utf-8'
+              )
+          else:
+              out.write_text("No http_req_duration samples parsed from raw.json\n", encoding='utf-8')
+          PY
+
+      - name: Install JMeter
+        run: |
+          JMETER_VER=5.6.3
+          curl -fsSL -o /tmp/jmeter.tgz "https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-${JMETER_VER}.tgz"
+          sudo tar -C /opt -xzf /tmp/jmeter.tgz
+          echo "JMETER_HOME=/opt/apache-jmeter-${JMETER_VER}" >> "$GITHUB_ENV"
+          echo "/opt/apache-jmeter-${JMETER_VER}/bin" >> "$GITHUB_PATH"
+          jmeter -v
+
+      - name: Configure JMeter security settings
+        run: |
+          printf '%s\n' \
+            'jmeter.save.saveservice.timestamp_format=yyyy/MM/dd HH:mm:ss' \
+            'jmeter.save.saveservice.default_delimiter=,' \
+            > /tmp/jmeter-user.properties
+
+      - name: Run JMeter plan
+        run: |
+          mkdir -p tests/jmeter/output perf-artifacts/jmeter
+          cp tests/jmeter/warehouse-load.jmx /tmp/warehouse-load.ci.jmx
+          sed -i 's#<stringProp name="HTTPSampler.domain">47.103.133.105</stringProp>#<stringProp name="HTTPSampler.domain">127.0.0.1</stringProp>#g' /tmp/warehouse-load.ci.jmx
+          sed -i 's#<stringProp name="HTTPSampler.port">30081</stringProp>#<stringProp name="HTTPSampler.port">8080</stringProp>#g' /tmp/warehouse-load.ci.jmx
+          jmeter -n -t /tmp/warehouse-load.ci.jmx \
+            -l tests/jmeter/output/result.jtl \
+            -j tests/jmeter/output/jmeter.log \
+            -q /tmp/jmeter-user.properties
+
+      - name: Generate JMeter JTL summary
+        run: |
+          python3 << 'PY'
+          import csv
+          from pathlib import Path
+          from statistics import mean
+          jtl = Path('tests/jmeter/output/result.jtl')
+          out = Path('perf-artifacts/jmeter/jtl-summary.txt')
+          out.parent.mkdir(parents=True, exist_ok=True)
+          if not jtl.exists():
+              out.write_text('missing result.jtl\n', encoding='utf-8')
+              raise SystemExit(0)
+          rows = []
+          with jtl.open('r', encoding='utf-8', errors='ignore', newline='') as f:
+              reader = csv.DictReader(f)
+              for r in reader:
+                  try:
+                      elapsed = float(r.get('elapsed','0'))
+                  except Exception:
+                      continue
+                  rows.append(elapsed)
+          if not rows:
+              out.write_text('no samples parsed from jtl\n', encoding='utf-8')
+          else:
+              s = sorted(rows)
+              def pct(q):
+                  idx = int(round((len(s)-1)*q))
+                  return s[max(0, min(len(s)-1, idx))]
+              out.write_text(
+                  "samples=%d\navg=%.2f ms\np50=%.2f ms\np95=%.2f ms\nmax=%.2f ms\n"
+                  % (len(rows), mean(rows), pct(0.50), pct(0.95), max(rows)),
+                  encoding='utf-8'
+              )
+          PY
+
+      - name: List generated files
+        run: |
+          ls -lah perf-artifacts/k6 || true
+          ls -lah perf-artifacts/jmeter || true
+          ls -lah tests/jmeter/output || true
+
+      - name: Upload k6 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-output
+          path: perf-artifacts/k6
+          if-no-files-found: warn
+
+      - name: Upload JMeter artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: jmeter-output
+          path: |
+            perf-artifacts/jmeter
+            tests/jmeter/output
+          if-no-files-found: warn
+
+      - name: Post Checkout code
+        run: echo "Post Checkout code"
+
+      - name: Complete job
+        if: always()
+        run: |
+          docker rm -f warehouse-app-ci 2>/dev/null || true
