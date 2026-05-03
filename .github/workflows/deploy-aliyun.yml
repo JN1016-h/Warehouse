@@ -7,11 +7,10 @@
 # Repo → Settings → Secrets and variables → Actions → Secrets:
 #   ALIYUN_HOST     — ECS IP / domain
 #   ALIYUN_USER     — SSH user
-#   ALIYUN_SSH_KEY  — Full PRIVATE key text (the file without .pub). Must include header/footer lines, e.g.
-#                     -----BEGIN OPENSSH PRIVATE KEY----- ... -----END OPENSSH PRIVATE KEY-----
-#                     or -----BEGIN RSA PRIVATE KEY----- ... -----END RSA PRIVATE KEY-----
-#                     Do not paste the .pub line; no extra quotes. If the key has a passphrase, add optional secret
-#                     ALIYUN_SSH_KEY_PASSPHRASE and set passphrase below.
+#   ALIYUN_SSH_KEY  — The PRIVATE key (never .pub, never authorized_keys). Usually the file you generated WITHOUT .pub:
+#                     e.g. id_ed25519 or id_rsa on your PC; or on ECS e.g. ~/.ssh/id_ed25519 (same pair whose .pub you put in authorized_keys).
+#                     Paste full text including -----BEGIN … PRIVATE KEY----- and -----END …----- lines.
+#                     Optional secret ALIYUN_SSH_KEY_PASSPHRASE if that private key is encrypted.
 # Variables (optional):
 #   ALIYUN_DEPLOY_PATH — clone path on server (default /opt/deploy/warehouse-management-project)
 #   K8S_DIR            — manifests dir (default <DEPLOY_PATH>/k8s from repo); use /opt/k8s if you keep copies only on server
@@ -48,12 +47,16 @@ jobs:
       # Multiline repo secrets are safer via env → file than passing raw `key:` (avoids ParsePrivateKey / empty key).
       - name: Write SSH private key
         run: |
-          f="$RUNNER_TEMP/deploy_ssh_key"
+          f="$GITHUB_WORKSPACE/.ssh_deploy_key"
           umask 077
           echo "$SSH_PRIVATE_KEY" > "$f"
           bytes=$(wc -c < "$f" | tr -d ' ')
           if [ "${bytes:-0}" -lt 80 ]; then
-            echo "::error::ALIYUN_SSH_KEY is empty or too short. Use the PRIVATE key file contents (with BEGIN/END lines), not the .pub line."
+            echo "::error::ALIYUN_SSH_KEY is empty or too short."
+            exit 1
+          fi
+          if ! grep -qE 'BEGIN (OPENSSH|RSA|EC) PRIVATE KEY' "$f"; then
+            echo "::error::ALIYUN_SSH_KEY must be a PRIVATE key PEM (contains BEGIN … PRIVATE KEY). Do not use .pub or authorized_keys."
             exit 1
           fi
         env:
@@ -70,7 +73,7 @@ jobs:
         with:
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
-          key_path: ${{ runner.temp }}/deploy_ssh_key
+          key_path: ${{ github.workspace }}/.ssh_deploy_key
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
           envs: GITHUB_RUN_NUMBER,GITHUB_SHA,DEPLOY_PATH,K8S_DIR,NAMESPACE
@@ -107,3 +110,7 @@ jobs:
             kubectl set image "deployment/warehouse-frontend" "frontend=${FE_IMAGE}" -n "${NS}" --record
             kubectl rollout status "deployment/warehouse-frontend" -n "${NS}" --timeout=300s || true
             echo "== done ${GITHUB_SHA}"
+
+      - name: Remove deploy SSH key file
+        if: always()
+        run: rm -f "$GITHUB_WORKSPACE/.ssh_deploy_key"
