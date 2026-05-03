@@ -59,6 +59,7 @@ jobs:
           key_path: ${{ github.workspace }}/.ssh_deploy_key
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
+          command_timeout: 45m
           envs: GITHUB_RUN_NUMBER,GITHUB_SHA,DEPLOY_PATH,K8S_DIR,NAMESPACE,REPO_GIT_URL,REPO_SSH_GIT_URL,GIT_SSH_IDENTITY_FILE
           script: |
             set -euo pipefail
@@ -102,11 +103,11 @@ jobs:
             kubectl apply -f "${KD}/namespace.yaml"
             kubectl apply -f "${KD}/app.yaml"
             kubectl set image "deployment/warehouse-app" "app=${IMAGE}" -n "${NS}" --record
-            kubectl rollout status "deployment/warehouse-app" -n "${NS}" --timeout=300s || true
+            kubectl rollout status "deployment/warehouse-app" -n "${NS}" --timeout=600s || true
             docker build -f deploy/frontend-ci.Dockerfile -t "${FE_IMAGE}" .
             kubectl apply -f "${KD}/frontend.yaml"
             kubectl set image "deployment/warehouse-frontend" "frontend=${FE_IMAGE}" -n "${NS}" --record
-            kubectl rollout status "deployment/warehouse-frontend" -n "${NS}" --timeout=300s || true
+            kubectl rollout status "deployment/warehouse-frontend" -n "${NS}" --timeout=600s || true
             echo "== done ${GITHUB_SHA}"
 
       - name: Remove deploy SSH key file
