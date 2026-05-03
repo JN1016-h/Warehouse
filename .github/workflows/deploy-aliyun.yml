@@ -1,6 +1,8 @@
 # Deploy to Alibaba Cloud ECS after CI passes (GitHub runner SSH → ECS).
 #
-# On ECS: install git, docker, kubectl; clone this repo; put K8s YAML under /opt/k8s/
+# On ECS (first time): install git, docker, kubectl; create DEPLOY_PATH and git clone this repo, e.g.
+#   sudo mkdir -p /opt/deploy && sudo git clone https://github.com/<owner>/<repo>.git /opt/deploy/warehouse-management-project
+#   (private repo: use a PAT or deploy key in the clone URL / ~/.git-credentials). Optional: copy k8s to /opt/k8s and set K8S_DIR.
 # Security group: SSH (22) must be reachable from the runner. GitHub-hosted runners use changing IPs —
 # if SSH fails quickly, allow temporary 0.0.0.0/0:22 for testing, use a bastion, or a self-hosted runner on ECS.
 #
@@ -70,13 +72,14 @@ jobs:
           DEPLOY_PATH: ${{ vars.ALIYUN_DEPLOY_PATH }}
           K8S_DIR: ${{ vars.K8S_DIR }}
           NAMESPACE: ${{ vars.K8S_NAMESPACE }}
+          REPO_GIT_URL: ${{ github.server_url }}/${{ github.repository }}.git
         with:
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
           key_path: ${{ github.workspace }}/.ssh_deploy_key
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
-          envs: GITHUB_RUN_NUMBER,GITHUB_SHA,DEPLOY_PATH,K8S_DIR,NAMESPACE
+          envs: GITHUB_RUN_NUMBER,GITHUB_SHA,DEPLOY_PATH,K8S_DIR,NAMESPACE,REPO_GIT_URL
           script: |
             set -euo pipefail
             DP="${DEPLOY_PATH:-/opt/deploy/warehouse-management-project}"
@@ -85,7 +88,8 @@ jobs:
             echo "== path=${DP} k8s=${KD} ns=${NS}"
             if [ ! -d "$DP" ]; then
               echo "ERROR: deploy directory missing: ${DP}"
-              echo "On ECS: sudo mkdir -p \"$(dirname "$DP")\" && sudo git clone <your-repo-url> \"$DP\""
+              echo "On ECS (once): sudo mkdir -p \"$(dirname "$DP")\" && sudo git clone \"${REPO_GIT_URL}\" \"$DP\""
+              echo "If the repo is private, clone on the server with a PAT/deploy key, or set Variable ALIYUN_DEPLOY_PATH to an existing clone path."
               exit 1
             fi
             if [ ! -e "$DP/.git" ]; then
