@@ -1,11 +1,3 @@
-# Matches GitHub Actions layout: sidebar jobs sast → unit → integration → container_iac_scan → dast → performance,
-# with performance steps aligned to the reference diagram (k6 + JMeter + artifacts).
-#
-# Production (K8s NodePort): defaults frontend http://HOST:30080/ — backend http://HOST:30081/
-# Override in Repo → Settings → Secrets and variables → Actions → Variables:
-#   PRODUCTION_HOST, PRODUCTION_FRONTEND_NODEPORT, PRODUCTION_BACKEND_NODEPORT
-# On the cluster/deploy host, manifests are applied from: /opt/k8s/app.yaml and /opt/k8s/frontend.yaml
-# (see repo k8s/*.yaml; Gitee pipeline default K8S_DIR is /opt/k8s).
 name: Cicd
 
 on:
