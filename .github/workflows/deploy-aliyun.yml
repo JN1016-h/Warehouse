@@ -1,25 +1,7 @@
-# Deploy to Alibaba Cloud ECS after CI passes (GitHub runner SSH → ECS).
-#
-# On ECS (first time): install git, docker, kubectl; create DEPLOY_PATH and git clone this repo, e.g.
-#   sudo mkdir -p /opt/deploy && sudo git clone https://github.com/<owner>/<repo>.git /opt/deploy/warehouse-management-project
-#   (private repo: use a PAT or deploy key in the clone URL / ~/.git-credentials). Optional: copy k8s to /opt/k8s and set K8S_DIR.
-# Security group: SSH (22) must be reachable from the runner. GitHub-hosted runners use changing IPs —
-# if SSH fails quickly, allow temporary 0.0.0.0/0:22 for testing, use a bastion, or a self-hosted runner on ECS.
-#
-# Repo → Settings → Secrets and variables → Actions → Secrets:
-#   ALIYUN_HOST     — ECS IP / domain
-#   ALIYUN_USER     — SSH user
-#   ALIYUN_SSH_KEY  — The PRIVATE key (never .pub, never authorized_keys). Usually the file you generated WITHOUT .pub:
-#                     e.g. id_ed25519 or id_rsa on your PC; or on ECS e.g. ~/.ssh/id_ed25519 (same pair whose .pub you put in authorized_keys).
-#                     Paste full text including -----BEGIN … PRIVATE KEY----- and -----END …----- lines.
-#                     Optional secret ALIYUN_SSH_KEY_PASSPHRASE if that private key is encrypted.
-# Variables (optional):
-#   ALIYUN_DEPLOY_PATH — clone path on server (default /opt/deploy/warehouse-management-project)
-#   K8S_DIR            — manifests dir (default <DEPLOY_PATH>/k8s from repo); use /opt/k8s if you keep copies only on server
-#   K8S_NAMESPACE      — default warehouse
-#   ALIYUN_SSH_PORT    — default 22
-#
-# Self-hosted runner (alternative): install runner on ECS, then use runs-on: [self-hosted] in a job.
+# GitHub → Actions → Variables (optional):
+#   ALIYUN_GIT_SSH_IDENTITY_FILE — ECS path to private key registered as repo Deploy key (e.g. /root/.ssh/github_repo_clone).
+#     When set and file exists, remote git fetch/checkout uses GIT_SSH_COMMAND (SSH remote on GitHub).
+
 name: Deploy Aliyun
 
 on:
@@ -73,13 +55,15 @@ jobs:
           K8S_DIR: ${{ vars.K8S_DIR }}
           NAMESPACE: ${{ vars.K8S_NAMESPACE }}
           REPO_GIT_URL: ${{ github.server_url }}/${{ github.repository }}.git
+          REPO_SSH_GIT_URL: git@github.com:${{ github.repository }}.git
+          GIT_SSH_IDENTITY_FILE: ${{ vars.ALIYUN_GIT_SSH_IDENTITY_FILE }}
         with:
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
           key_path: ${{ github.workspace }}/.ssh_deploy_key
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
-          envs: GITHUB_RUN_NUMBER,GITHUB_SHA,DEPLOY_PATH,K8S_DIR,NAMESPACE,REPO_GIT_URL
+          envs: GITHUB_RUN_NUMBER,GITHUB_SHA,DEPLOY_PATH,K8S_DIR,NAMESPACE,REPO_GIT_URL,REPO_SSH_GIT_URL,GIT_SSH_IDENTITY_FILE
           script: |
             set -euo pipefail
             DP="${DEPLOY_PATH:-/opt/deploy/warehouse-management-project}"
@@ -88,8 +72,10 @@ jobs:
             echo "== path=${DP} k8s=${KD} ns=${NS}"
             if [ ! -d "$DP" ]; then
               echo "ERROR: deploy directory missing: ${DP}"
-              echo "On ECS (once): sudo mkdir -p \"$(dirname "$DP")\" && sudo git clone \"${REPO_GIT_URL}\" \"$DP\""
-              echo "If the repo is private, clone on the server with a PAT/deploy key, or set Variable ALIYUN_DEPLOY_PATH to an existing clone path."
+              echo "On ECS (once), HTTPS: sudo mkdir -p \"$(dirname "$DP")\" && sudo git clone \"${REPO_GIT_URL}\" \"$DP\""
+              echo "Or SSH (add Deploy key from *.pub first), set Variable ALIYUN_GIT_SSH_IDENTITY_FILE on GitHub, then:"
+              echo "  sudo mkdir -p \"$(dirname "$DP")\" && sudo GIT_SSH_COMMAND=\"ssh -i /path/to/key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new\" git clone \"${REPO_SSH_GIT_URL}\" \"$DP\""
+              echo "Private repo: PAT in HTTPS URL, or Deploy key + ALIYUN_GIT_SSH_IDENTITY_FILE. Or set ALIYUN_DEPLOY_PATH to an existing clone."
               exit 1
             fi
             if [ ! -e "$DP/.git" ]; then
@@ -99,6 +85,14 @@ jobs:
             if ! command -v docker >/dev/null 2>&1; then echo "ERROR: docker not in PATH"; exit 1; fi
             if ! command -v kubectl >/dev/null 2>&1; then echo "ERROR: kubectl not in PATH"; exit 1; fi
             cd "$DP"
+            if [ -n "${GIT_SSH_IDENTITY_FILE:-}" ]; then
+              if [ -f "${GIT_SSH_IDENTITY_FILE}" ]; then
+                export GIT_SSH_COMMAND="ssh -i ${GIT_SSH_IDENTITY_FILE} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+                echo "== git→GitHub using identity ${GIT_SSH_IDENTITY_FILE}"
+              else
+                echo "::warning::ALIYUN_GIT_SSH_IDENTITY_FILE points to missing file: ${GIT_SSH_IDENTITY_FILE}"
+              fi
+            fi
             git fetch origin
             git checkout master
             git reset --hard origin/master
