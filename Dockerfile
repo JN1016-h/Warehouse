@@ -1,4 +1,5 @@
-FROM maven:3.8.8-eclipse-temurin-8 AS build
+ARG REGISTRY_MIRROR=m.daocloud.io/docker.io/library
+FROM ${REGISTRY_MIRROR}/maven:3.8.8-eclipse-temurin-8 AS build
 WORKDIR /app
 
 COPY pom.xml ./
@@ -10,8 +11,7 @@ RUN rm -rf src/main/resources/admin/admin/node_modules || true
 
 RUN mvn "-Dmaven.test.skip=true" package
 
-
-FROM eclipse-temurin:8-jre
+FROM ${REGISTRY_MIRROR}/eclipse-temurin:8-jre
 WORKDIR /app
 
 ENV JAVA_OPTS=""
