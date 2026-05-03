@@ -1,6 +1,17 @@
-# GitHub → Actions → Variables (optional):
-#   ALIYUN_GIT_SSH_IDENTITY_FILE — ECS path to private key registered as repo Deploy key (e.g. /root/.ssh/github_repo_clone).
-#     When set and file exists, remote git fetch/checkout uses GIT_SSH_COMMAND (SSH remote on GitHub).
+# Deploy to Alibaba Cloud ECS after CI passes (GitHub runner SSH -> ECS).
+#
+# On ECS (first time): install git, docker, kubectl; create DEPLOY_PATH and git clone this repo.
+#   HTTPS: sudo mkdir -p /opt/deploy && sudo git clone https://github.com/<owner>/<repo>.git /opt/deploy/warehouse-management-project
+#   SSH: add Deploy key from *.pub on GitHub repo, then clone with GIT_SSH_COMMAND (see error hint in workflow) or set Variable ALIYUN_GIT_SSH_IDENTITY_FILE for deploy-time git fetch.
+#   Private repo: PAT in HTTPS URL, or Deploy key + ALIYUN_GIT_SSH_IDENTITY_FILE.
+# Security group: SSH (22) must be reachable from the runner (GitHub-hosted IPs change; use bastion/self-hosted runner if needed).
+#
+# Repo -> Settings -> Secrets and variables -> Actions -> Secrets:
+#   ALIYUN_HOST, ALIYUN_USER, ALIYUN_SSH_KEY (full PRIVATE key PEM; not .pub; optional ALIYUN_SSH_KEY_PASSPHRASE)
+# Variables (optional):
+#   ALIYUN_DEPLOY_PATH, K8S_DIR, K8S_NAMESPACE, ALIYUN_SSH_PORT
+#   ALIYUN_GIT_SSH_IDENTITY_FILE — on ECS, path to private key registered as GitHub Deploy key (e.g. /root/.ssh/github_repo_clone).
+#     When set and file exists, remote script exports GIT_SSH_COMMAND before git fetch (ECS -> GitHub over SSH).
 
 name: Deploy Aliyun
 
