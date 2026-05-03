@@ -10,8 +10,9 @@
 #   ALIYUN_HOST, ALIYUN_USER, ALIYUN_SSH_KEY (full PRIVATE key PEM; not .pub; optional ALIYUN_SSH_KEY_PASSPHRASE)
 # Variables (optional):
 #   ALIYUN_DEPLOY_PATH, K8S_DIR, K8S_NAMESPACE, ALIYUN_SSH_PORT
-#   ALIYUN_GIT_SSH_IDENTITY_FILE — on ECS, path to private key registered as GitHub Deploy key (e.g. /root/.ssh/github_repo_clone).
-#     When set and file exists, remote script exports GIT_SSH_COMMAND before git fetch (ECS -> GitHub over SSH).
+#   ALIYUN_GIT_SSH_IDENTITY_FILE — REQUIRED on ECS if git remote origin is SSH (git@github.com:...).
+#     Path to the Deploy key private key readable by ALIYUN_USER (e.g. /root/.ssh/github_repo_clone). Sets GIT_SSH_COMMAND for git fetch.
+#     If origin is HTTPS, this variable is optional.
 
 name: Deploy Aliyun
 
@@ -96,13 +97,17 @@ jobs:
             if ! command -v docker >/dev/null 2>&1; then echo "ERROR: docker not in PATH"; exit 1; fi
             if ! command -v kubectl >/dev/null 2>&1; then echo "ERROR: kubectl not in PATH"; exit 1; fi
             cd "$DP"
-            if [ -n "${GIT_SSH_IDENTITY_FILE:-}" ]; then
-              if [ -f "${GIT_SSH_IDENTITY_FILE}" ]; then
-                export GIT_SSH_COMMAND="ssh -i ${GIT_SSH_IDENTITY_FILE} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
-                echo "== git→GitHub using identity ${GIT_SSH_IDENTITY_FILE}"
-              else
-                echo "::warning::ALIYUN_GIT_SSH_IDENTITY_FILE points to missing file: ${GIT_SSH_IDENTITY_FILE}"
+            ORIGIN_URL="$(git remote get-url origin 2>/dev/null || true)"
+            echo "== git origin: ${ORIGIN_URL}"
+            if echo "${ORIGIN_URL}" | grep -q '^git@'; then
+              if [ -z "${GIT_SSH_IDENTITY_FILE:-}" ] || [ ! -r "${GIT_SSH_IDENTITY_FILE}" ]; then
+                echo "::error::origin is SSH (${ORIGIN_URL}) but ALIYUN_GIT_SSH_IDENTITY_FILE is unset or not readable by this user."
+                echo "::error::GitHub repo -> Settings -> Variables -> ALIYUN_GIT_SSH_IDENTITY_FILE = /root/.ssh/github_repo_clone (or your key path; must be readable by ALIYUN_USER)."
+                echo "::error::Or on ECS once: git remote set-url origin \"${REPO_GIT_URL}\" and use HTTPS + PAT/credential helper."
+                exit 1
               fi
+              export GIT_SSH_COMMAND="ssh -i ${GIT_SSH_IDENTITY_FILE} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+              echo "== git->GitHub via GIT_SSH_COMMAND (${GIT_SSH_IDENTITY_FILE})"
             fi
             git fetch origin
             git checkout master
