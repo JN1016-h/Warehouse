@@ -10,7 +10,7 @@ export const options = {
   },
 };
 
-const baseUrl = __ENV.BASE_URL || 'http://127.0.0.1:8080/springboot38hdw40x';
+const baseUrl = __ENV.BASE_URL || 'http://121.40.253.17:30081/springboot38hdw40x';
 
 export default function () {
   const res1 = http.get(`${baseUrl}/shangpinfenlei/list?page=1&limit=10`);

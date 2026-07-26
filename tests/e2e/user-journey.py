@@ -10,8 +10,8 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-API_BASE = os.environ.get("E2E_API_BASE", "http://127.0.0.1:8080/springboot38hdw40x").rstrip("/")
-FE_BASE = os.environ.get("E2E_FE_BASE", "http://127.0.0.1:30080").rstrip("/")
+API_BASE = os.environ.get("E2E_API_BASE", "http://121.40.253.17:30081/springboot38hdw40x").rstrip("/")
+FE_BASE = os.environ.get("E2E_FE_BASE", "http://121.40.253.17:30080").rstrip("/")
 OUT = Path(os.environ.get("E2E_OUT", "reports/e2e"))
 
 

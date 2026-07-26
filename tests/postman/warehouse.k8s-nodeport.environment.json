@@ -1,9 +1,14 @@
 {
-  "name": "k8s-直连后端(NodePort)",
+  "name": "k8s-nodeport",
   "values": [
     {
       "key": "baseUrl",
-      "value": "http://47.103.133.105:30081/springboot38hdw40x",
+      "value": "http://121.40.253.17:30081/springboot38hdw40x",
+      "enabled": true
+    },
+    {
+      "key": "feBase",
+      "value": "http://121.40.253.17:30080",
       "enabled": true
     }
   ],

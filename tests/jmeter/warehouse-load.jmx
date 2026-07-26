@@ -28,7 +28,7 @@
       </ThreadGroup>
       <hashTree>
         <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="HTTP 默认" enabled="true">
-          <stringProp name="HTTPSampler.domain">47.103.133.105</stringProp>
+          <stringProp name="HTTPSampler.domain">121.40.253.17</stringProp>
           <stringProp name="HTTPSampler.port">30081</stringProp>
           <stringProp name="HTTPSampler.protocol">http</stringProp>
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="用户定义的变量" enabled="true">

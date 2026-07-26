@@ -30,7 +30,6 @@
 		<sonar.sources>src/main/java,src/main/resources</sonar.sources>
 		<sonar.tests>src/test/java</sonar.tests>
 		<sonar.java.binaries>${project.build.directory}/classes</sonar.java.binaries>
-		<sonar.java.test.binaries>${project.build.directory}/test-classes</sonar.java.test.binaries>
 		<sonar.java.source>1.8</sonar.java.source>
 		<sonar.sourceEncoding>UTF-8</sonar.sourceEncoding>
 		<sonar.exclusions>**/src/main/resources/admin/**,**/node_modules/**,**/static/**,**/*.min.js</sonar.exclusions>

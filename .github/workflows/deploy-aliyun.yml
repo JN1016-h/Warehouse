@@ -255,9 +255,10 @@ jobs:
               '{"spec":{"template":{"spec":{"containers":[{"name":"frontend","imagePullPolicy":"Always"}]}}}}'
             kubectl rollout status "deployment/warehouse-app" -n "${NS}" --timeout=600s
             kubectl rollout status "deployment/warehouse-frontend" -n "${NS}" --timeout=600s
-            NODE_IP="$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || echo 127.0.0.1)"
-            curl -fsS "http://${NODE_IP}:30081/springboot38hdw40x/config/list?page=1&limit=1" >/dev/null && echo API_OK
-            curl -fsS -o /dev/null "http://${NODE_IP}:30080/" && echo FE_OK
+            NODE_IP="$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || echo 121.40.253.17)"
+            PUB="${PUBLIC_HOST:-121.40.253.17}"
+            curl -fsS "http://${PUB}:30081/springboot38hdw40x/config/list?page=1&limit=1" >/dev/null && echo API_OK
+            curl -fsS -o /dev/null "http://${PUB}:30080/" && echo FE_OK
             kubectl get pods -n "${NS}" -o wide
             kubectl get deploy -n "${NS}" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.template.spec.containers[0].image}{"\n"}{end}'
             echo "== deployed app=${IMAGE} fe=${FE_IMAGE} (mysql untouched)"
@@ -311,9 +312,9 @@ jobs:
             set -euo pipefail
             NS="${NAMESPACE:-warehouse}"
             kubectl get pods,svc,deploy -n "${NS}" -o wide
-            NODE_IP="$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || echo 127.0.0.1)"
-            curl -fsS "http://${NODE_IP}:30081/springboot38hdw40x/config/list?page=1&limit=1" && echo
-            curl -fsS -o /dev/null "http://${NODE_IP}:30080/" && echo FE_OK
+            PUB="${PUBLIC_HOST:-121.40.253.17}"
+            curl -fsS "http://${PUB}:30081/springboot38hdw40x/config/list?page=1&limit=1" && echo
+            curl -fsS -o /dev/null "http://${PUB}:30080/" && echo FE_OK
             echo "build=${GITHUB_RUN_NUMBER}"
 
       - name: Summary

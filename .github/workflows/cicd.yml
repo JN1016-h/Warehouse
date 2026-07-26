@@ -143,7 +143,7 @@ jobs:
       - name: Compile + restore JaCoCo for Sonar
         run: |
           set -euo pipefail
-          mvn -B -ntp -DskipTests compile
+          mvn -B -ntp -DskipTests compile test-compile
           mkdir -p target/site
           if [ -d unit-art/target/site/jacoco ]; then
             cp -r unit-art/target/site/jacoco target/site/jacoco
@@ -153,8 +153,6 @@ jobs:
             cp -r unit-art/reports/unit/jacoco target/site/jacoco
           elif [ -d unit-art/unit/jacoco ]; then
             cp -r unit-art/unit/jacoco target/site/jacoco
-          elif [ -d unit-art/reports/unit/jacoco ]; then
-            cp -r unit-art/reports/unit/jacoco target/site/jacoco
           fi
           if [ ! -f target/site/jacoco/jacoco.xml ]; then
             xml="$(find unit-art -name jacoco.xml 2>/dev/null | head -n1 || true)"
@@ -183,6 +181,10 @@ jobs:
             echo "::error::Set secrets SONAR_HOST_URL and SONAR_TOKEN (and Variable SONAR_ENABLED=true)"
             exit 1
           fi
+          EXTRA=()
+          if [ -d target/test-classes ]; then
+            EXTRA+=(-Dsonar.java.test.binaries=target/test-classes)
+          fi
           mvn -B -ntp -DskipTests org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar \
             -Dsonar.host.url="${SONAR_HOST_URL}" \
             -Dsonar.token="${SONAR_TOKEN}" \
@@ -190,7 +192,8 @@ jobs:
             -Dsonar.projectName="Warehouse Management" \
             -Dsonar.java.binaries=target/classes \
             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
-            -Dsonar.scm.provider=git
+            -Dsonar.scm.provider=git \
+            "${EXTRA[@]}"
 
       - name: Enrich Sonar (wait CE + review hotspots + export measures)
         env:
