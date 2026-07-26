@@ -285,13 +285,12 @@ public class YonghuController {
         if(yonghuService.selectCount(new EntityWrapper<YonghuEntity>().eq("yonghuzhanghao", yonghu.getYonghuzhanghao()))>0) {
             return R.error("账号已存在");
         }
-    	yonghu.setId(new Date().getTime()+new Double(Math.floor(Math.random()*1000)).longValue());
+    	yonghu.setId(new Date().getTime());
     	//ValidatorUtils.validateEntity(yonghu);
     	YonghuEntity u = yonghuService.selectOne(new EntityWrapper<YonghuEntity>().eq("yonghuzhanghao", yonghu.getYonghuzhanghao()));
 		if(u!=null) {
 			return R.error("用户已存在");
 		}
-		yonghu.setId(new Date().getTime());
 		if (StringUtils.isNotBlank(yonghu.getMima())) {
 			yonghu.setMima(EncryptUtil.md5(yonghu.getMima()));
 		}
@@ -307,13 +306,12 @@ public class YonghuController {
         if(yonghuService.selectCount(new EntityWrapper<YonghuEntity>().eq("yonghuzhanghao", yonghu.getYonghuzhanghao()))>0) {
             return R.error("账号已存在");
         }
-    	yonghu.setId(new Date().getTime()+new Double(Math.floor(Math.random()*1000)).longValue());
+    	yonghu.setId(new Date().getTime());
     	//ValidatorUtils.validateEntity(yonghu);
     	YonghuEntity u = yonghuService.selectOne(new EntityWrapper<YonghuEntity>().eq("yonghuzhanghao", yonghu.getYonghuzhanghao()));
 		if(u!=null) {
 			return R.error("用户已存在");
 		}
-		yonghu.setId(new Date().getTime());
 		if (StringUtils.isNotBlank(yonghu.getMima())) {
 			yonghu.setMima(EncryptUtil.md5(yonghu.getMima()));
 		}
