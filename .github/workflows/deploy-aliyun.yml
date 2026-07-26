@@ -99,7 +99,7 @@ jobs:
         uses: appleboy/ssh-action@v1.2.1
         env:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
-          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
           DEPLOY_PATH: ${{ vars.ALIYUN_DEPLOY_PATH }}
           HARBOR_HOST: ${{ vars.HARBOR_HOST }}
           HARBOR_PROJECT: ${{ vars.HARBOR_PROJECT }}
@@ -116,14 +116,16 @@ jobs:
             DP="${DEPLOY_PATH:-/opt/deploy/warehouse-management-project}"
             HH="${HARBOR_HOST:-121.40.253.17}"
             HP="${HARBOR_PROJECT:-warehouse}"
-            TAG="build.${GITHUB_RUN_NUMBER}"
+            SHORT="$(printf '%s' "${GITHUB_SHA}" | cut -c1-7)"
+            TAG="build.${GITHUB_RUN_NUMBER}-${SHORT}"
             IMAGE="${HH}/${HP}/warehouse-app:${TAG}"
             FE_IMAGE="${HH}/${HP}/warehouse-frontend:${TAG}"
             cd "$DP"
-            docker build -t "${IMAGE}" -f ./Dockerfile .
-            docker build -t "${FE_IMAGE}" -f deploy/frontend-ci.Dockerfile .
+            docker build -t "${IMAGE}" -t "${HH}/${HP}/warehouse-app:latest" -f ./Dockerfile .
+            docker build -t "${FE_IMAGE}" -t "${HH}/${HP}/warehouse-frontend:latest" -f deploy/frontend-ci.Dockerfile .
             echo "${IMAGE}" > /tmp/warehouse-app.image
             echo "${FE_IMAGE}" > /tmp/warehouse-frontend.image
+            echo "${TAG}" > /tmp/warehouse-image.tag
             echo "== BUILD ok ${IMAGE} ${FE_IMAGE}"
 
   push-harbor:
@@ -153,9 +155,8 @@ jobs:
             HP="${HARBOR_PROJECT:-warehouse}"
             HU="${HARBOR_USER:-admin}"
             HPW="${HARBOR_PASSWORD:-Harbor12345}"
-            TAG="build.${GITHUB_RUN_NUMBER}"
-            IMAGE="${HH}/${HP}/warehouse-app:${TAG}"
-            FE_IMAGE="${HH}/${HP}/warehouse-frontend:${TAG}"
+            IMAGE="$(cat /tmp/warehouse-app.image)"
+            FE_IMAGE="$(cat /tmp/warehouse-frontend.image)"
             curl -fsS -u "${HU}:${HPW}" -H 'Content-Type: application/json' \
               -X POST "http://${HH}/api/v2.0/projects" \
               -d "{\"project_name\":\"${HP}\",\"public\":true,\"metadata\":{\"public\":\"true\"}}" \
@@ -163,6 +164,8 @@ jobs:
             echo "${HPW}" | docker login "${HH}" -u "${HU}" --password-stdin
             docker push "${IMAGE}"
             docker push "${FE_IMAGE}"
+            docker push "${HH}/${HP}/warehouse-app:latest" || true
+            docker push "${HH}/${HP}/warehouse-frontend:latest" || true
             echo "== pushed ${IMAGE} ${FE_IMAGE}"
 
   prepare-k8s:
@@ -223,6 +226,7 @@ jobs:
           NAMESPACE: ${{ vars.K8S_NAMESPACE }}
           HARBOR_HOST: ${{ vars.HARBOR_HOST }}
           HARBOR_PROJECT: ${{ vars.HARBOR_PROJECT }}
+          PUBLIC_HOST: ${{ vars.PUBLIC_HOST || '121.40.253.17' }}
         with:
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
@@ -230,17 +234,14 @@ jobs:
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
           command_timeout: 30m
-          envs: GITHUB_RUN_NUMBER,DEPLOY_PATH,K8S_DIR,NAMESPACE,HARBOR_HOST,HARBOR_PROJECT
+          envs: GITHUB_RUN_NUMBER,DEPLOY_PATH,K8S_DIR,NAMESPACE,HARBOR_HOST,HARBOR_PROJECT,PUBLIC_HOST
           script: |
             set -euo pipefail
             DP="${DEPLOY_PATH:-/opt/deploy/warehouse-management-project}"
             KD="${K8S_DIR:-${DP}/k8s}"
             NS="${NAMESPACE:-warehouse}"
-            HH="${HARBOR_HOST:-121.40.253.17}"
-            HP="${HARBOR_PROJECT:-warehouse}"
-            TAG="build.${GITHUB_RUN_NUMBER}"
-            IMAGE="${HH}/${HP}/warehouse-app:${TAG}"
-            FE_IMAGE="${HH}/${HP}/warehouse-frontend:${TAG}"
+            IMAGE="$(cat /tmp/warehouse-app.image)"
+            FE_IMAGE="$(cat /tmp/warehouse-frontend.image)"
             kubectl apply -f "${KD}/app.yaml"
             kubectl apply -f "${KD}/frontend.yaml"
             kubectl -n "${NS}" patch deployment warehouse-app --type strategic -p \
@@ -253,9 +254,10 @@ jobs:
               '{"spec":{"template":{"spec":{"containers":[{"name":"app","imagePullPolicy":"Always"}]}}}}'
             kubectl -n "${NS}" patch deployment warehouse-frontend -p \
               '{"spec":{"template":{"spec":{"containers":[{"name":"frontend","imagePullPolicy":"Always"}]}}}}'
+            kubectl -n "${NS}" annotate deployment warehouse-app warehouse-frontend \
+              "kubectl.kubernetes.io/restartedAt=$(date -u +%Y-%m-%dT%H:%M:%SZ)" --overwrite
             kubectl rollout status "deployment/warehouse-app" -n "${NS}" --timeout=600s
             kubectl rollout status "deployment/warehouse-frontend" -n "${NS}" --timeout=600s
-            NODE_IP="$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || echo 121.40.253.17)"
             PUB="${PUBLIC_HOST:-121.40.253.17}"
             curl -fsS "http://${PUB}:30081/springboot38hdw40x/config/list?page=1&limit=1" >/dev/null && echo API_OK
             curl -fsS -o /dev/null "http://${PUB}:30080/" && echo FE_OK
