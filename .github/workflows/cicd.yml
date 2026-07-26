@@ -496,21 +496,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # v4: pattern 匹配多个 artifact 时必须 merge-multiple:true，或直接不写 pattern 下载全部
       - name: Download all report artifacts
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           path: collected
-          pattern: "*-reports"
-          merge-multiple: false
+          # 每个 artifact 解压到 collected/<artifact-name>/
+          # 不使用 pattern，避免「多匹配 + merge-multiple:false」直接失败
 
       - name: Assemble dashboard
         run: |
           set -euo pipefail
-          mkdir -p dashboard
+          mkdir -p dashboard collected
+          if [ ! -d collected ] || [ -z "$(ls -A collected 2>/dev/null || true)" ]; then
+            echo "No report artifacts downloaded; generating empty dashboard shell"
+            echo '<html><body><h1>CI Dashboard</h1><p>No stage reports available yet.</p></body></html>' > dashboard/index.html
+            ls -lah dashboard
+            exit 0
+          fi
           # Flatten known HTML files into dashboard/
-          find collected -type f \( -name '*.html' -o -name '*.htm' \) | while read -r f; do
+          find collected -type f \( -name '*.html' -o -name '*.htm' \) 2>/dev/null | while read -r f; do
             base="$(basename "$f")"
-            # avoid overwrite collisions
             rel="$(echo "$f" | sed 's#^collected/##' | tr '/' '_')"
             cp "$f" "dashboard/${rel}"
           done
@@ -563,6 +570,7 @@ jobs:
           ls -lah dashboard | head -50
 
       - name: Upload HTML dashboard
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ci-html-dashboard
