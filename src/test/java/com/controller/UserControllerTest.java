@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
 
 /**
  * UserController测试类
@@ -330,5 +331,193 @@ public class UserControllerTest {
         when(yonghuService.selectOne(any())).thenReturn(null);
         R result = yonghuController.resetPass("missing", ControllerTestSupport.mockAdminRequest());
         assertEquals(500, result.get("code"));
+    }
+
+    @Test
+    public void testLoginWrongPasswordHashed() {
+        YonghuEntity user = new YonghuEntity();
+        user.setMima(EncryptUtil.md5("correct"));
+        when(yonghuService.selectOne(any())).thenReturn(user);
+
+        R result = yonghuController.login("user", "wrong", null, null, ControllerTestSupport.mockAdminRequest());
+        assertEquals(500, result.get("code"));
+    }
+
+    @Test
+    public void testLoginViaRequestBody() {
+        YonghuEntity user = new YonghuEntity();
+        user.setId(1L);
+        user.setYonghuzhanghao("bodyuser");
+        user.setMima(EncryptUtil.md5("pass123"));
+        when(yonghuService.selectOne(any())).thenReturn(user);
+        when(tokenService.generateToken(anyLong(), anyString(), anyString(), anyString())).thenReturn("token");
+
+        com.dto.LoginRequest body = new com.dto.LoginRequest();
+        body.setUsername("bodyuser");
+        body.setPassword("pass123");
+
+        R result = yonghuController.login(null, null, null, body, ControllerTestSupport.mockAdminRequest());
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testRegisterNullEntity() {
+        R result = yonghuController.register(null);
+        assertEquals(500, result.get("code"));
+    }
+
+    @Test
+    public void testRegisterBlankFields() {
+        YonghuEntity yonghu = new YonghuEntity();
+        yonghu.setYonghuzhanghao("  ");
+        yonghu.setMima("");
+        R result = yonghuController.register(yonghu);
+        assertEquals(500, result.get("code"));
+    }
+
+    @Test
+    public void testRegisterInsertFailure() {
+        YonghuEntity yonghu = new YonghuEntity();
+        yonghu.setYonghuzhanghao("failuser");
+        yonghu.setMima("pass123");
+        when(yonghuService.selectOne(any())).thenReturn(null);
+        doThrow(new RuntimeException("db")).when(yonghuService).insert(any());
+
+        R result = yonghuController.register(yonghu);
+        assertEquals(500, result.get("code"));
+    }
+
+    @Test
+    public void testRegisterTrimsName() {
+        YonghuEntity yonghu = new YonghuEntity();
+        yonghu.setYonghuzhanghao(" trimuser ");
+        yonghu.setMima("pass123");
+        yonghu.setYonghuxingming(" 张三 ");
+        when(yonghuService.selectOne(any())).thenReturn(null);
+
+        R result = yonghuController.register(yonghu);
+        assertEquals(0, result.get("code"));
+        assertEquals("trimuser", yonghu.getYonghuzhanghao());
+        assertEquals("张三", yonghu.getYonghuxingming());
+    }
+
+    @Test
+    public void testSaveDuplicateByCount() {
+        YonghuEntity yonghu = new YonghuEntity();
+        yonghu.setYonghuzhanghao("dup");
+        when(yonghuService.selectCount(any())).thenReturn(1);
+
+        R result = yonghuController.save(yonghu, ControllerTestSupport.mockAdminRequest());
+        assertEquals(500, result.get("code"));
+    }
+
+    @Test
+    public void testSaveDuplicateBySelectOne() {
+        YonghuEntity yonghu = new YonghuEntity();
+        yonghu.setYonghuzhanghao("dup2");
+        when(yonghuService.selectCount(any())).thenReturn(0);
+        when(yonghuService.selectOne(any())).thenReturn(new YonghuEntity());
+
+        R result = yonghuController.save(yonghu, ControllerTestSupport.mockAdminRequest());
+        assertEquals(500, result.get("code"));
+    }
+
+    @Test
+    public void testSaveWithoutPassword() {
+        YonghuEntity yonghu = new YonghuEntity();
+        yonghu.setYonghuzhanghao("nopass");
+        yonghu.setMima("  ");
+        when(yonghuService.selectCount(any())).thenReturn(0);
+        when(yonghuService.selectOne(any())).thenReturn(null);
+
+        R result = yonghuController.save(yonghu, ControllerTestSupport.mockAdminRequest());
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testAddDuplicate() {
+        YonghuEntity yonghu = new YonghuEntity();
+        yonghu.setYonghuzhanghao("adddup");
+        when(yonghuService.selectCount(any())).thenReturn(1);
+
+        R result = yonghuController.add(yonghu, ControllerTestSupport.mockAdminRequest());
+        assertEquals(500, result.get("code"));
+    }
+
+    @Test
+    public void testUpdateDuplicateUsername() {
+        YonghuEntity yonghu = new YonghuEntity();
+        yonghu.setId(1L);
+        yonghu.setYonghuzhanghao("taken");
+        when(yonghuService.selectCount(any())).thenReturn(1);
+
+        R result = yonghuController.update(yonghu, ControllerTestSupport.mockAdminRequest());
+        assertEquals(500, result.get("code"));
+    }
+
+    @Test
+    public void testUpdateWithoutUsernameSkipsToken() {
+        YonghuEntity yonghu = new YonghuEntity();
+        yonghu.setId(1L);
+        yonghu.setYonghuzhanghao(null);
+        when(yonghuService.selectCount(any())).thenReturn(0);
+
+        R result = yonghuController.update(yonghu, ControllerTestSupport.mockAdminRequest());
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testUpdateUserRoleMissingParams() {
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("userId", "1");
+        params.put("role", "");
+        R result = yonghuController.updateUserRole(params);
+        assertEquals(500, result.get("code"));
+    }
+
+    @Test
+    public void testLoginStoredPasswordNull() {
+        YonghuEntity user = new YonghuEntity();
+        user.setId(1L);
+        user.setYonghuzhanghao("nullpass");
+        user.setMima(null);
+        when(yonghuService.selectOne(any())).thenReturn(user);
+
+        R result = yonghuController.login("nullpass", "any", null, null, ControllerTestSupport.mockAdminRequest());
+        assertEquals(500, result.get("code"));
+    }
+
+    @Test
+    public void testRegisterWithoutDisplayName() {
+        YonghuEntity yonghu = new YonghuEntity();
+        yonghu.setYonghuzhanghao("noname");
+        yonghu.setMima("pass123");
+        yonghu.setYonghuxingming(null);
+        when(yonghuService.selectOne(any())).thenReturn(null);
+
+        R result = yonghuController.register(yonghu);
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testAddDuplicateBySelectOne() {
+        YonghuEntity yonghu = new YonghuEntity();
+        yonghu.setYonghuzhanghao("adddup2");
+        when(yonghuService.selectCount(any())).thenReturn(0);
+        when(yonghuService.selectOne(any())).thenReturn(new YonghuEntity());
+
+        R result = yonghuController.add(yonghu, ControllerTestSupport.mockAdminRequest());
+        assertEquals(500, result.get("code"));
+    }
+
+    @Test
+    public void testUpdateWithUsernameUpdatesToken() {
+        YonghuEntity yonghu = new YonghuEntity();
+        yonghu.setId(1L);
+        yonghu.setYonghuzhanghao("renamed");
+        when(yonghuService.selectCount(any())).thenReturn(0);
+
+        R result = yonghuController.update(yonghu, ControllerTestSupport.mockAdminRequest());
+        assertEquals(0, result.get("code"));
     }
 }

@@ -231,4 +231,115 @@ public class ShangpinxinxiControllerTest {
         R result = controller.group("status", ControllerTestSupport.mockAdminRequest());
         assertEquals(0, result.get("code"));
     }
+
+    @Test
+    public void testValueFromJsonCache() throws Exception {
+        String file = "value_shangpinxinxi_colX_colY_timeType.json";
+        try {
+            ControllerTestSupport.writeJsonCache(file, "[{\"total\":20}]");
+            R result = controller.value("colY", "colX", ControllerTestSupport.mockAdminRequest());
+            assertEquals(0, result.get("code"));
+        } finally {
+            ControllerTestSupport.deleteJsonCache(file);
+        }
+    }
+
+    @Test
+    public void testValueMulFromJsonCache() throws Exception {
+        String file = "value_shangpinxinxi_colX_colY1,colY2_timeType.json";
+        try {
+            ControllerTestSupport.writeJsonCache(file, "[{\"total\":21}]");
+            R result = controller.valueMul("colX", "colY1,colY2", ControllerTestSupport.mockAdminRequest());
+            assertEquals(0, result.get("code"));
+        } finally {
+            ControllerTestSupport.deleteJsonCache(file);
+        }
+    }
+
+    @Test
+    public void testValueDayFromJsonCache() throws Exception {
+        String file = "value_shangpinxinxi_colX_colY_day.json";
+        try {
+            ControllerTestSupport.writeJsonCache(file, "[{\"total\":22}]");
+            R result = controller.valueDay("colY", "colX", "day", ControllerTestSupport.mockAdminRequest());
+            assertEquals(0, result.get("code"));
+        } finally {
+            ControllerTestSupport.deleteJsonCache(file);
+        }
+    }
+
+    @Test
+    public void testValueMulDayFromJsonCache() throws Exception {
+        String file = "value_shangpinxinxi_colX_colY1,colY2_day.json";
+        try {
+            ControllerTestSupport.writeJsonCache(file, "[{\"total\":23}]");
+            R result = controller.valueMulDay("colX", "day", "colY1,colY2", ControllerTestSupport.mockAdminRequest());
+            assertEquals(0, result.get("code"));
+        } finally {
+            ControllerTestSupport.deleteJsonCache(file);
+        }
+    }
+
+    @Test
+    public void testGroupFromJsonCache() throws Exception {
+        String file = "group_shangpinxinxi_status_timeType.json";
+        try {
+            ControllerTestSupport.writeJsonCache(file, "[{\"total\":24}]");
+            R result = controller.group("status", ControllerTestSupport.mockAdminRequest());
+            assertEquals(0, result.get("code"));
+        } finally {
+            ControllerTestSupport.deleteJsonCache(file);
+        }
+    }
+
+    @Test
+    public void testValueMulWithDatesInRows() throws Exception {
+        List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
+        Map<String, Object> row = new HashMap<String, Object>();
+        row.put("total", 10);
+        row.put("addtime", new Date());
+        rows.add(row);
+        when(shangpinxinxiService.selectValue(any(), any())).thenReturn(rows);
+
+        R result = controller.valueMul("colX", "colY1,colY2", ControllerTestSupport.mockAdminRequest());
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testValueDayWithDatesInRows() throws Exception {
+        List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
+        Map<String, Object> row = new HashMap<String, Object>();
+        row.put("total", 10);
+        row.put("addtime", new Date());
+        rows.add(row);
+        when(shangpinxinxiService.selectTimeStatValue(any(), any())).thenReturn(rows);
+
+        R result = controller.valueDay("colY", "colX", "day", ControllerTestSupport.mockAdminRequest());
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testValueMulDayWithDatesInRows() throws Exception {
+        List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
+        Map<String, Object> row = new HashMap<String, Object>();
+        row.put("total", 10);
+        row.put("addtime", new Date());
+        rows.add(row);
+        when(shangpinxinxiService.selectTimeStatValue(any(), any())).thenReturn(rows);
+
+        R result = controller.valueMulDay("colX", "day", "colY1,colY2", ControllerTestSupport.mockAdminRequest());
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testGroupWithNonDateFields() throws Exception {
+        List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
+        Map<String, Object> row = new HashMap<String, Object>();
+        row.put("status", "ok");
+        rows.add(row);
+        when(shangpinxinxiService.selectGroup(any(), any())).thenReturn(rows);
+
+        R result = controller.group("status", ControllerTestSupport.mockAdminRequest());
+        assertEquals(0, result.get("code"));
+    }
 }

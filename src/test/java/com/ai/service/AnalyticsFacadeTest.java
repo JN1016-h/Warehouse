@@ -23,9 +23,12 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -253,6 +256,377 @@ public class AnalyticsFacadeTest {
 
         Map<String, Object> result = analyticsFacade.assemble(AiIntent.SELL_THROUGH, range, true);
         assertTrue((Boolean) result.get("hasData"));
+    }
+
+    @Test
+    public void assembleSellThroughAllLevels() {
+        List<ShangpinxinxiEntity> products = new ArrayList<ShangpinxinxiEntity>();
+        products.add(product("HOT", "畅销", "上衣", 10, 5, 7, 0));
+        products.add(product("NORM", "平销", "裤子", 10, 5, 7, 0));
+        products.add(product("SLOW", "滞销", "外套", 10, 5, 7, 0));
+        when(shangpinxinxiDao.selectList(any())).thenReturn(products);
+
+        List<ChukuxinxiEntity> outbounds = new ArrayList<ChukuxinxiEntity>();
+        outbounds.add(outbound("HOT", 50, daysAgo(1)));
+        outbounds.add(outbound("NORM", 5, daysAgo(2)));
+        outbounds.add(outbound("SLOW", 1, daysAgo(3)));
+        when(chukuxinxiDao.selectList(any())).thenReturn(outbounds);
+        when(aiProperties.getTopN()).thenReturn(10);
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.SELL_THROUGH, range, true);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> st = (Map<String, Object>) result.get("sellThrough");
+        assertNotNull(st.get("hotTop"));
+        assertNotNull(st.get("normalTop"));
+        assertNotNull(st.get("slowTop"));
+    }
+
+    @Test
+    public void assembleReplenishSkipsHealthyStock() {
+        ShangpinxinxiEntity healthy = product("OK", "充足", "上衣", 500, 5, 7, 0);
+        when(shangpinxinxiDao.selectList(any())).thenReturn(Collections.singletonList(healthy));
+        when(chukuxinxiDao.selectList(any())).thenReturn(Collections.<ChukuxinxiEntity>emptyList());
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.REPLENISH, range, true);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> rep = (Map<String, Object>) result.get("replenish");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> suggestions = (List<Map<String, Object>>) rep.get("suggestions");
+        assertTrue(suggestions.isEmpty());
+    }
+
+    @Test
+    public void assembleReplenishForceAlertDespiteZeroSuggest() {
+        ShangpinxinxiEntity low = product("LOW", "低库存", "上衣", 1, 10, 7, 0);
+        when(shangpinxinxiDao.selectList(any())).thenReturn(Collections.singletonList(low));
+        when(chukuxinxiDao.selectList(any())).thenReturn(Collections.<ChukuxinxiEntity>emptyList());
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.REPLENISH, range, true);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> rep = (Map<String, Object>) result.get("replenish");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> suggestions = (List<Map<String, Object>>) rep.get("suggestions");
+        assertFalse(suggestions.isEmpty());
+        assertTrue((Boolean) suggestions.get(0).get("forceAlert"));
+    }
+
+    @Test
+    public void assembleReplenishTrimsToTopN() {
+        when(aiProperties.getTopN()).thenReturn(1);
+        List<ShangpinxinxiEntity> products = new ArrayList<ShangpinxinxiEntity>();
+        products.add(product("A", "款A", "上衣", 1, 20, 7, 0));
+        products.add(product("B", "款B", "裤子", 1, 20, 7, 0));
+        when(shangpinxinxiDao.selectList(any())).thenReturn(products);
+        when(chukuxinxiDao.selectList(any())).thenReturn(Collections.<ChukuxinxiEntity>emptyList());
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.REPLENISH, range, true);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> rep = (Map<String, Object>) result.get("replenish");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> suggestions = (List<Map<String, Object>>) rep.get("suggestions");
+        assertEquals(1, suggestions.size());
+    }
+
+    @Test
+    public void assembleRiskInfiniteSupportDays() {
+        ShangpinxinxiEntity p = product("SAFE", "充足", "上衣", 100, 5, 7, 0);
+        p.setKucunyuzhi(50);
+        when(shangpinxinxiDao.selectList(any())).thenReturn(Collections.singletonList(p));
+        when(chukuxinxiDao.selectList(any())).thenReturn(Collections.<ChukuxinxiEntity>emptyList());
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.RISK, range, true);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> risk = (Map<String, Object>) result.get("risk");
+        assertNotNull(risk.get("overstockTop"));
+    }
+
+    @Test
+    public void assembleInventoryNullCategoryAndNullInboundQty() {
+        ShangpinxinxiEntity p = product("NC", "无分类", "上衣", 5, 0, 7, 0);
+        p.setShangpinfenlei(null);
+        p.setKucunyuzhi(null);
+        when(shangpinxinxiDao.selectList(any())).thenReturn(Collections.singletonList(p));
+
+        RukuxinxiEntity inbound = inbound("NC", 0, daysAgo(1));
+        inbound.setFuzhuangkucun(null);
+        when(rukuxinxiDao.selectList(any())).thenReturn(Collections.singletonList(inbound));
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.INVENTORY, range, true);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> inv = (Map<String, Object>) result.get("inventory");
+        assertNotNull(inv.get("stockByCategory"));
+    }
+
+    @Test
+    public void assembleWithNullTimeRangeBounds() {
+        TimeRange openRange = new TimeRange(null, null, "全部");
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.INVENTORY, openRange, true);
+        assertNotNull(result.get("inventory"));
+    }
+
+    @Test
+    public void assembleDuplicateOutboundSkuAggregates() {
+        List<ChukuxinxiEntity> outbounds = new ArrayList<ChukuxinxiEntity>();
+        outbounds.add(outbound("P001", 10, daysAgo(5)));
+        outbounds.add(outbound("P001", 15, daysAgo(3)));
+        ChukuxinxiEntity older = outbound("P001", 5, daysAgo(20));
+        outbounds.add(older);
+        when(chukuxinxiDao.selectList(any())).thenReturn(outbounds);
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.SELL_THROUGH, range, true);
+        assertTrue((Boolean) result.get("hasData"));
+    }
+
+    @Test
+    public void assembleOutboundNullDeliveryTimeSkipped() {
+        ChukuxinxiEntity e = outbound("P001", 5, null);
+        when(chukuxinxiDao.selectList(any())).thenReturn(Collections.singletonList(e));
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.RISK, range, true);
+        assertNotNull(result.get("risk"));
+    }
+
+    @Test
+    public void assembleLatestSalePriceSkipsNullPrice() {
+        List<DinghuoxinxiEntity> orders = new ArrayList<DinghuoxinxiEntity>();
+        DinghuoxinxiEntity bad = new DinghuoxinxiEntity();
+        bad.setFuzhuangbianhao("P001");
+        bad.setXiaoshoudanjia(null);
+        orders.add(bad);
+        DinghuoxinxiEntity good = new DinghuoxinxiEntity();
+        good.setFuzhuangbianhao("P001");
+        good.setXiaoshoudanjia(88.0);
+        good.setDinghuoshijian(daysAgo(2));
+        orders.add(good);
+        when(dinghuoxinxiDao.selectList(any())).thenReturn(orders);
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.TURNOVER, range, true);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> turnover = (Map<String, Object>) result.get("turnover");
+        assertNotNull(turnover.get("items"));
+    }
+
+    @Test
+    public void assembleTurnoverEmptyProducts() {
+        when(shangpinxinxiDao.selectList(any())).thenReturn(Collections.<ShangpinxinxiEntity>emptyList());
+        when(chukuxinxiDao.selectList(any())).thenReturn(Collections.<ChukuxinxiEntity>emptyList());
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.TURNOVER, range, false);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> turnover = (Map<String, Object>) result.get("turnover");
+        assertEquals(0.0, turnover.get("avgStock"));
+    }
+
+    @Test
+    public void assembleInboundScanWhenAllNull() {
+        when(rukuxinxiDao.selectList(any())).thenReturn(null);
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.RISK, range, true);
+        assertNotNull(result.get("risk"));
+    }
+
+    @Test
+    public void assembleInboundNullSkuSkipped() {
+        RukuxinxiEntity bad = inbound(null, 5, daysAgo(1));
+        when(rukuxinxiDao.selectList(any())).thenReturn(Collections.singletonList(bad));
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.RISK, range, true);
+        assertNotNull(result.get("risk"));
+    }
+
+    @Test
+    public void assembleNullStockProducts() {
+        ShangpinxinxiEntity p = product("NS", "无库存", "上衣", 0, 5, 7, 0);
+        p.setFuzhuangkucun(null);
+        when(shangpinxinxiDao.selectList(any())).thenReturn(Collections.singletonList(p));
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.SELL_THROUGH, range, true);
+        assertNotNull(result.get("sellThrough"));
+    }
+
+    @Test
+    public void assembleRiskWithStockoutRisk() {
+        ShangpinxinxiEntity p = product("LOW", "缺货", "上衣", 2, 20, 7, 0);
+        when(shangpinxinxiDao.selectList(any())).thenReturn(Collections.singletonList(p));
+
+        List<ChukuxinxiEntity> out30 = new ArrayList<ChukuxinxiEntity>();
+        out30.add(outbound("LOW", 300, daysAgo(1)));
+        when(chukuxinxiDao.selectList(any())).thenReturn(out30);
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.RISK, range, true);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> risk = (Map<String, Object>) result.get("risk");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> stockout = (List<Map<String, Object>>) risk.get("stockoutTop");
+        assertFalse(stockout.isEmpty());
+    }
+
+    @Test
+    public void assembleSellThroughTrimsHotAndSlowLists() {
+        when(aiProperties.getTopN()).thenReturn(1);
+        List<ShangpinxinxiEntity> products = new ArrayList<ShangpinxinxiEntity>();
+        products.add(product("H1", "热1", "上衣", 5, 1, 7, 0));
+        products.add(product("H2", "热2", "上衣", 5, 1, 7, 0));
+        when(shangpinxinxiDao.selectList(any())).thenReturn(products);
+
+        List<ChukuxinxiEntity> outbounds = new ArrayList<ChukuxinxiEntity>();
+        outbounds.add(outbound("H1", 50, daysAgo(1)));
+        outbounds.add(outbound("H2", 40, daysAgo(2)));
+        when(chukuxinxiDao.selectList(any())).thenReturn(outbounds);
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.SELL_THROUGH, range, true);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> st = (Map<String, Object>) result.get("sellThrough");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> hot = (List<Map<String, Object>>) st.get("hotTop");
+        assertEquals(1, hot.size());
+    }
+
+    @Test
+    public void assembleInventoryLowStockAtTopNLimit() {
+        when(aiProperties.getTopN()).thenReturn(1);
+        List<ShangpinxinxiEntity> products = new ArrayList<ShangpinxinxiEntity>();
+        products.add(product("L1", "低1", "上衣", 1, 10, 7, 0));
+        products.add(product("L2", "低2", "裤子", 2, 10, 7, 0));
+        when(shangpinxinxiDao.selectList(any())).thenReturn(products);
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.INVENTORY, range, true);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> inv = (Map<String, Object>) result.get("inventory");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> low = (List<Map<String, Object>>) inv.get("lowStockTop");
+        assertEquals(1, low.size());
+    }
+
+    @Test
+    public void assembleOutboundNullQtyTreatedAsZero() {
+        ChukuxinxiEntity e = outbound("P001", 0, daysAgo(1));
+        e.setFuzhuangkucun(null);
+        when(chukuxinxiDao.selectList(any())).thenReturn(Collections.singletonList(e));
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.SELL_THROUGH, range, true);
+        assertNotNull(result.get("sellThrough"));
+    }
+
+    @Test
+    public void assembleHasDataTrueWhenOnlyOutbound() {
+        when(shangpinxinxiDao.selectList(any())).thenReturn(Collections.<ShangpinxinxiEntity>emptyList());
+        when(chukuxinxiDao.selectList(any())).thenReturn(sampleOutbounds());
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.INVENTORY, range, true);
+        assertTrue((Boolean) result.get("hasData"));
+    }
+
+    @Test
+    public void assembleHasDataFalseWhenBothEmpty() {
+        when(shangpinxinxiDao.selectList(any())).thenReturn(Collections.<ShangpinxinxiEntity>emptyList());
+        when(chukuxinxiDao.selectList(any())).thenReturn(Collections.<ChukuxinxiEntity>emptyList());
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.INVENTORY, range, true);
+        assertFalse((Boolean) result.get("hasData"));
+    }
+
+    @Test
+    public void coeffComparatorsHandleNullValues() throws Exception {
+        Method desc = AnalyticsFacade.class.getDeclaredMethod("coeffDesc");
+        desc.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Comparator<Map<String, Object>> descCmp = (Comparator<Map<String, Object>>) desc.invoke(analyticsFacade);
+
+        Map<String, Object> a = new HashMap<String, Object>();
+        a.put("coefficient", null);
+        Map<String, Object> b = new HashMap<String, Object>();
+        b.put("coefficient", 1.5);
+        assertTrue(descCmp.compare(a, b) > 0);
+        assertTrue(descCmp.compare(b, a) < 0);
+
+        Method asc = AnalyticsFacade.class.getDeclaredMethod("coeffAsc");
+        asc.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Comparator<Map<String, Object>> ascCmp = (Comparator<Map<String, Object>>) asc.invoke(analyticsFacade);
+        assertTrue(ascCmp.compare(a, b) < 0);
+    }
+
+    @Test
+    public void assembleTurnoverSkuWithoutOutboundEntry() {
+        ShangpinxinxiEntity p = product("NOOUT", "无出库", "上衣", 10, 5, 7, 0);
+        when(shangpinxinxiDao.selectList(any())).thenReturn(Collections.singletonList(p));
+        when(chukuxinxiDao.selectList(any())).thenReturn(Collections.<ChukuxinxiEntity>emptyList());
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.TURNOVER, range, true);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> turnover = (Map<String, Object>) result.get("turnover");
+        assertNotNull(turnover.get("items"));
+    }
+
+    @Test
+    public void trimHandlesNullAndOversizedList() throws Exception {
+        Method trim = AnalyticsFacade.class.getDeclaredMethod("trim", List.class, int.class);
+        trim.setAccessible(true);
+        assertNull(trim.invoke(analyticsFacade, null, 5));
+
+        List<Map<String, Object>> small = new ArrayList<Map<String, Object>>();
+        small.add(new HashMap<String, Object>());
+        assertSame(small, trim.invoke(analyticsFacade, small, 5));
+
+        List<Map<String, Object>> big = new ArrayList<Map<String, Object>>();
+        big.add(new HashMap<String, Object>());
+        big.add(new HashMap<String, Object>());
+        big.add(new HashMap<String, Object>());
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> trimmed = (List<Map<String, Object>>) trim.invoke(analyticsFacade, big, 2);
+        assertEquals(2, trimmed.size());
+    }
+
+    @Test
+    public void assembleLatestSalePriceSkipsDuplicateSku() {
+        List<DinghuoxinxiEntity> orders = new ArrayList<DinghuoxinxiEntity>();
+        DinghuoxinxiEntity first = new DinghuoxinxiEntity();
+        first.setFuzhuangbianhao("P001");
+        first.setXiaoshoudanjia(100.0);
+        first.setDinghuoshijian(daysAgo(1));
+        orders.add(first);
+        DinghuoxinxiEntity second = new DinghuoxinxiEntity();
+        second.setFuzhuangbianhao("P001");
+        second.setXiaoshoudanjia(50.0);
+        second.setDinghuoshijian(daysAgo(5));
+        orders.add(second);
+        when(dinghuoxinxiDao.selectList(any())).thenReturn(orders);
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.TURNOVER, range, true);
+        assertNotNull(result.get("turnover"));
+    }
+
+    @Test
+    public void assembleRiskWithNullLastTimesUsesWindowDays() {
+        ShangpinxinxiEntity p = product("NEW", "新品", "上衣", 50, 5, 7, 0);
+        when(shangpinxinxiDao.selectList(any())).thenReturn(Collections.singletonList(p));
+        when(chukuxinxiDao.selectList(any())).thenReturn(Collections.<ChukuxinxiEntity>emptyList());
+        when(rukuxinxiDao.selectList(any())).thenReturn(Collections.<RukuxinxiEntity>emptyList());
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.RISK, range, true);
+        assertNotNull(result.get("risk"));
+    }
+
+    @Test
+    public void assembleInboundOlderDateNotReplaced() {
+        List<RukuxinxiEntity> inbounds = new ArrayList<RukuxinxiEntity>();
+        inbounds.add(inbound("P001", 5, daysAgo(20)));
+        inbounds.add(inbound("P001", 3, daysAgo(5)));
+        when(rukuxinxiDao.selectList(any())).thenReturn(inbounds);
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.RISK, range, true);
+        assertNotNull(result.get("risk"));
+    }
+
+    @Test
+    public void assembleSellThroughNoOutboundForSku() {
+        ShangpinxinxiEntity p = product("NONE", "无出库", "上衣", 10, 5, 7, 0);
+        when(shangpinxinxiDao.selectList(any())).thenReturn(Collections.singletonList(p));
+        when(chukuxinxiDao.selectList(any())).thenReturn(Collections.<ChukuxinxiEntity>emptyList());
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.SELL_THROUGH, range, true);
+        assertNotNull(result.get("sellThrough"));
     }
 
     private List<ShangpinxinxiEntity> sampleProducts() {

@@ -213,6 +213,53 @@ public class AiChatServiceTest {
         assertNull(aiChatService.exportReport(99L, 1L, "md"));
     }
 
+    @Test
+    public void chatNullUserDenied() {
+        AiChatResponse resp = aiChatService.chat(request("库存"), null);
+        assertTrue(resp.isDenied());
+    }
+
+    @Test
+    public void chatFinanceDeniedSavesHistory() {
+        DataScopeResolver.ResolvedUser warehouse = new DataScopeResolver.ResolvedUser();
+        warehouse.userId = 2L;
+        warehouse.tableName = "yonghu";
+        warehouse.dataScope = DataScopeResolver.SCOPE_WAREHOUSE;
+        when(intentRouter.route(anyString())).thenReturn(AiIntent.FINANCE);
+
+        AiChatResponse resp = aiChatService.chat(request("应收"), warehouse);
+
+        assertTrue(resp.isDenied());
+        verify(chatHistoryService, times(2)).saveMessage(anyLong(), anyString(), anyString(), any(), anyBoolean(), anyString());
+    }
+
+    @Test
+    public void chatNullQuestionUsesEmpty() {
+        AiChatRequest req = request("");
+        req.setQuestion(null);
+        AiChatResponse resp = aiChatService.chat(req, financeUser);
+        assertEquals("请输入要查询的问题。", resp.getAnswer());
+    }
+
+    @Test
+    public void exportReportMarkdownNullFields() {
+        AiChatMessageEntity msg = new AiChatMessageEntity();
+        msg.setIntent("GENERAL");
+        msg.setDegraded(0);
+        msg.setContent(null);
+        msg.setDataSnapshot(null);
+        when(chatHistoryService.getMessage(3L, 1L)).thenReturn(msg);
+
+        String md = aiChatService.exportReport(3L, 1L, "md");
+        assertTrue(md.contains("# AI 分析报告"));
+        assertTrue(md.contains("false"));
+    }
+
+    @Test
+    public void previewNullUserThrows() {
+        assertThrows(IllegalStateException.class, () -> aiChatService.preview(request("x"), null));
+    }
+
     private AiChatRequest request(String question) {
         AiChatRequest req = new AiChatRequest();
         req.setQuestion(question);

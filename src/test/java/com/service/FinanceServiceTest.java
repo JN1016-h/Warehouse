@@ -549,4 +549,193 @@ public class FinanceServiceTest {
         PageUtils result = financeService.queryReceivables(query);
         assertNotNull(result);
     }
+
+    @Test
+    public void testQueryReceivables_NullPageLimit() {
+        ReceivableQuery query = new ReceivableQuery();
+        when(chukuxinxiDao.selectPage(any(), any())).thenReturn(Collections.emptyList());
+        PageUtils result = financeService.queryReceivables(query);
+        assertNotNull(result);
+    }
+
+    @Test
+    public void testQueryPayables_NullPageLimit() {
+        PayableQuery query = new PayableQuery();
+        when(rukuxinxiDao.selectPage(any(), any())).thenReturn(Collections.emptyList());
+        PageUtils result = financeService.queryPayables(query);
+        assertNotNull(result);
+    }
+
+    @Test
+    public void testCalculateReceivableSummary_WithFilters() {
+        ReceivableQuery query = new ReceivableQuery();
+        query.setStartDate(new Date());
+        query.setEndDate(new Date());
+        query.setPaymentStatus(PaymentStatus.PAID);
+        query.setCustomerName("客户A");
+
+        when(chukuxinxiDao.selectList(any())).thenReturn(Collections.emptyList());
+        FinanceSummary result = financeService.calculateReceivableSummary(query);
+        assertEquals(0, result.getTotalCount());
+    }
+
+    @Test
+    public void testCalculatePayableSummary_WithFilters() {
+        PayableQuery query = new PayableQuery();
+        query.setStartDate(new Date());
+        query.setPaymentStatus(PaymentStatus.UNPAID);
+        query.setSupplierName("供应商");
+
+        when(rukuxinxiDao.selectList(any())).thenReturn(Collections.emptyList());
+        FinanceSummary result = financeService.calculatePayableSummary(query);
+        assertEquals(0, result.getTotalCount());
+    }
+
+    @Test
+    public void testCalculateReceivableSummary_NullZongjine() {
+        ReceivableQuery query = new ReceivableQuery();
+        ChukuxinxiEntity entity = new ChukuxinxiEntity();
+        entity.setFuzhuangbianhao("CK001");
+        entity.setKehumingcheng("客户A");
+        entity.setPaymentStatus("UNPAID");
+
+        DinghuoxinxiEntity order = new DinghuoxinxiEntity();
+        order.setZongjine(null);
+
+        when(chukuxinxiDao.selectList(any())).thenReturn(Collections.singletonList(entity));
+        when(dinghuoxinxiDao.selectList(any())).thenReturn(Collections.singletonList(order));
+
+        FinanceSummary result = financeService.calculateReceivableSummary(query);
+        assertEquals(BigDecimal.ZERO, result.getTotalAmount());
+    }
+
+    @Test
+    public void testCalculatePayableSummary_ByDinghuoIdNullAmount() {
+        PayableQuery query = new PayableQuery();
+        RukuxinxiEntity entity = new RukuxinxiEntity();
+        entity.setDinghuoid("5");
+        entity.setPaymentStatus("PAID");
+
+        DinghuoxinxiEntity order = new DinghuoxinxiEntity();
+        order.setZongjine(null);
+
+        when(rukuxinxiDao.selectList(any())).thenReturn(Collections.singletonList(entity));
+        when(dinghuoxinxiDao.selectById(5L)).thenReturn(order);
+
+        FinanceSummary result = financeService.calculatePayableSummary(query);
+        assertEquals(BigDecimal.ZERO, result.getTotalAmount());
+    }
+
+    @Test
+    public void testCalculatePayableSummary_EmptyDinghuoId() {
+        PayableQuery query = new PayableQuery();
+        RukuxinxiEntity entity = new RukuxinxiEntity();
+        entity.setDinghuoid("  ");
+        entity.setFuzhuangbianhao("RK001");
+        entity.setGongyingshangmingcheng("供应商A");
+        entity.setPaymentStatus("UNPAID");
+
+        when(rukuxinxiDao.selectList(any())).thenReturn(Collections.singletonList(entity));
+        when(dinghuoxinxiDao.selectList(any())).thenReturn(Collections.emptyList());
+
+        FinanceSummary result = financeService.calculatePayableSummary(query);
+        assertEquals(BigDecimal.ZERO, result.getTotalAmount());
+    }
+
+    @Test
+    public void testQueryPayables_InvalidPaymentStatusDefaultsUnpaid() {
+        PayableQuery query = new PayableQuery();
+        query.setPage(1);
+        query.setLimit(10);
+
+        RukuxinxiEntity entity = new RukuxinxiEntity();
+        entity.setId(1L);
+        entity.setPaymentStatus("BAD");
+
+        when(rukuxinxiDao.selectPage(any(), any())).thenReturn(Collections.singletonList(entity));
+        when(dinghuoxinxiDao.selectById(any())).thenReturn(null);
+        when(dinghuoxinxiDao.selectList(any())).thenReturn(Collections.emptyList());
+
+        PageUtils result = financeService.queryPayables(query);
+        assertNotNull(result.getList());
+    }
+
+    @Test
+    public void testQueryPayables_NullPaymentStatus() {
+        PayableQuery query = new PayableQuery();
+        RukuxinxiEntity entity = new RukuxinxiEntity();
+        entity.setPaymentStatus(null);
+
+        when(rukuxinxiDao.selectPage(any(), any())).thenReturn(Collections.singletonList(entity));
+        when(dinghuoxinxiDao.selectList(any())).thenReturn(Collections.emptyList());
+
+        PageUtils result = financeService.queryPayables(query);
+        assertNotNull(result);
+    }
+
+    @Test
+    public void testCalculatePayableSummary_NullZongjineFromList() {
+        PayableQuery query = new PayableQuery();
+        RukuxinxiEntity entity = new RukuxinxiEntity();
+        entity.setFuzhuangbianhao("RK001");
+        entity.setGongyingshangmingcheng("供应商A");
+        entity.setPaymentStatus("PAID");
+
+        DinghuoxinxiEntity order = new DinghuoxinxiEntity();
+        order.setZongjine(null);
+
+        when(rukuxinxiDao.selectList(any())).thenReturn(Collections.singletonList(entity));
+        when(dinghuoxinxiDao.selectList(any())).thenReturn(Collections.singletonList(order));
+
+        FinanceSummary result = financeService.calculatePayableSummary(query);
+        assertEquals(BigDecimal.ZERO, result.getTotalAmount());
+    }
+
+    @Test
+    public void testUpdatePaymentStatus_ExceptionReturnsFalse() {
+        when(chukuxinxiDao.selectById(1L)).thenThrow(new RuntimeException("db"));
+        assertFalse(financeService.updatePaymentStatus(1L, "OUTBOUND", PaymentStatus.PAID));
+    }
+
+    @Test
+    public void testQueryReceivables_EmptyCustomerNameSkipped() {
+        ReceivableQuery query = new ReceivableQuery();
+        query.setCustomerName("   ");
+        when(chukuxinxiDao.selectPage(any(), any())).thenReturn(Collections.emptyList());
+        PageUtils result = financeService.queryReceivables(query);
+        assertNotNull(result);
+    }
+
+    @Test
+    public void testQueryPayables_EmptySupplierNameSkipped() {
+        PayableQuery query = new PayableQuery();
+        query.setSupplierName("  ");
+        when(rukuxinxiDao.selectPage(any(), any())).thenReturn(Collections.emptyList());
+        PageUtils result = financeService.queryPayables(query);
+        assertNotNull(result);
+    }
+
+    @Test
+    public void testCalculateReceivableSummary_EmptyCustomerName() {
+        ReceivableQuery query = new ReceivableQuery();
+        query.setCustomerName("  ");
+        when(chukuxinxiDao.selectList(any())).thenReturn(Collections.emptyList());
+        FinanceSummary result = financeService.calculateReceivableSummary(query);
+        assertEquals(0, result.getTotalCount());
+    }
+
+    @Test
+    public void testCalculatePayableSummary_ByDinghuoIdNotFound() {
+        PayableQuery query = new PayableQuery();
+        RukuxinxiEntity entity = new RukuxinxiEntity();
+        entity.setDinghuoid("99");
+        entity.setPaymentStatus("UNPAID");
+
+        when(rukuxinxiDao.selectList(any())).thenReturn(Collections.singletonList(entity));
+        when(dinghuoxinxiDao.selectById(99L)).thenReturn(null);
+        when(dinghuoxinxiDao.selectList(any())).thenReturn(Collections.emptyList());
+
+        FinanceSummary result = financeService.calculatePayableSummary(query);
+        assertEquals(BigDecimal.ZERO, result.getTotalAmount());
+    }
 }

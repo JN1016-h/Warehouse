@@ -137,4 +137,40 @@ public class CommonControllerTest {
         R result = controller.remindCount("yonghu", "addtime", "1", new HashMap<String, Object>());
         assertEquals(0, result.get("code"));
     }
+
+    @Test
+    public void testRemindCountType2OnlyEnd() {
+        when(commonService.remindCount(any())).thenReturn(1);
+        Map<String, Object> map = new HashMap<String, Object>();
+        map.put("remindend", "3");
+        R result = controller.remindCount("yonghu", "addtime", "2", map);
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testGroupNonDateField() {
+        List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
+        Map<String, Object> row = new HashMap<String, Object>();
+        row.put("status", "ok");
+        rows.add(row);
+        when(commonService.selectGroup(any())).thenReturn(rows);
+        R result = controller.group("yonghu", "status");
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testRemindCountType2OnlyStart() {
+        when(commonService.remindCount(any())).thenReturn(2);
+        Map<String, Object> map = new HashMap<String, Object>();
+        map.put("remindstart", "2");
+        R result = controller.remindCount("yonghu", "addtime", "2", map);
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testCalEmptyResult() {
+        when(commonService.selectCal(any())).thenReturn(new HashMap<String, Object>());
+        R result = controller.cal("yonghu", "money");
+        assertEquals(0, result.get("code"));
+    }
 }

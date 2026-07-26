@@ -5,6 +5,10 @@ import org.mockito.Mockito;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -47,5 +51,16 @@ public final class ControllerTestSupport {
 
     public static HttpServletRequest mockAdminRequest() {
         return mockRequestWithSession("users", "admin", 1L, null);
+    }
+
+    /** Write a JSON cache file used by controller stat endpoints (cwd-relative). */
+    public static Path writeJsonCache(String filename, String json) throws Exception {
+        Path path = Paths.get(filename);
+        Files.write(path, json.getBytes(StandardCharsets.UTF_8));
+        return path;
+    }
+
+    public static void deleteJsonCache(String filename) throws Exception {
+        Files.deleteIfExists(Paths.get(filename));
     }
 }

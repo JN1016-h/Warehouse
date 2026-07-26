@@ -480,4 +480,108 @@ public class FinanceControllerTest {
         R result = financeController.getPayableSummary(new HashMap<String, Object>());
         assertEquals(500, result.get("code"));
     }
+
+    @Test
+    public void testGetReceivableSummaryServiceError() {
+        when(financeService.calculateReceivableSummary(any(ReceivableQuery.class)))
+                .thenThrow(new RuntimeException("recv summary error"));
+
+        R result = financeController.getReceivableSummary(new HashMap<String, Object>());
+        assertEquals(500, result.get("code"));
+    }
+
+    @Test
+    public void testQueryPayablesServiceError() {
+        when(financeService.queryPayables(any(PayableQuery.class)))
+                .thenThrow(new RuntimeException("payables error"));
+
+        R result = financeController.queryPayables(new HashMap<String, Object>());
+        assertEquals(500, result.get("code"));
+    }
+
+    @Test
+    public void testQueryReceivablesWithEmptyPaymentStatus() {
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("paymentStatus", "");
+        when(financeService.queryReceivables(any(ReceivableQuery.class)))
+                .thenReturn(new PageUtils(Collections.emptyList(), 0, 10, 1));
+
+        R result = financeController.queryReceivables(params);
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testQueryPayablesDefaultPagination() {
+        when(financeService.queryPayables(any(PayableQuery.class)))
+                .thenReturn(new PageUtils(Collections.emptyList(), 0, 10, 1));
+
+        R result = financeController.queryPayables(new HashMap<String, Object>());
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testExportPayablesExcelServiceError() throws Exception {
+        when(financeService.queryPayables(any(PayableQuery.class)))
+                .thenThrow(new RuntimeException("excel error"));
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        financeController.exportPayablesToExcel(new HashMap<String, Object>(), response);
+        assertEquals(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, response.getStatus());
+    }
+
+    @Test
+    public void testQueryPayablesWithEmptyPaymentStatus() {
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("paymentStatus", "");
+        when(financeService.queryPayables(any(PayableQuery.class)))
+                .thenReturn(new PageUtils(Collections.emptyList(), 0, 10, 1));
+
+        R result = financeController.queryPayables(params);
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testQueryPayablesInvalidDateAndStatus() {
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("startDate", "bad");
+        params.put("paymentStatus", "INVALID");
+        when(financeService.queryPayables(any(PayableQuery.class)))
+                .thenReturn(new PageUtils(Collections.emptyList(), 0, 10, 1));
+
+        R result = financeController.queryPayables(params);
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testGetReceivableSummaryInvalidDates() {
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("startDate", "not-a-date");
+        params.put("endDate", "also-bad");
+        when(financeService.calculateReceivableSummary(any(ReceivableQuery.class)))
+                .thenReturn(new FinanceSummary());
+
+        R result = financeController.getReceivableSummary(params);
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testGetPayableSummaryInvalidDates() {
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("startDate", "bad");
+        when(financeService.calculatePayableSummary(any(PayableQuery.class)))
+                .thenReturn(new FinanceSummary());
+
+        R result = financeController.getPayableSummary(params);
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testExportReceivablesPdfServiceError() throws Exception {
+        when(financeService.queryReceivables(any(ReceivableQuery.class)))
+                .thenThrow(new RuntimeException("pdf error"));
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        financeController.exportReceivablesToPDF(new HashMap<String, Object>(), response);
+        assertEquals(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, response.getStatus());
+    }
 }

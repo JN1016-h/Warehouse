@@ -265,4 +265,187 @@ public class RukuxinxiControllerTest {
                 ControllerTestSupport.mockRequestWithSession("yonghu", "user1", 1L, null));
         assertEquals(0, result.get("code"));
     }
+
+    @Test
+    public void testCountAsYonghu() {
+        when(rukuxinxiService.selectCount(any())).thenReturn(4);
+        R result = controller.count(ControllerTestSupport.pageParams(), new RukuxinxiEntity(),
+                ControllerTestSupport.mockRequestWithSession("yonghu", "user1", 1L, null));
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testValueMulAsYonghu() throws Exception {
+        when(rukuxinxiService.selectValue(any(), any())).thenReturn(Collections.emptyList());
+        R result = controller.valueMul("colX", "colY1,colY2",
+                ControllerTestSupport.mockRequestWithSession("yonghu", "user1", 1L, null));
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testValueDayAsYonghu() throws Exception {
+        when(rukuxinxiService.selectTimeStatValue(any(), any())).thenReturn(Collections.emptyList());
+        R result = controller.valueDay("colY", "colX", "day",
+                ControllerTestSupport.mockRequestWithSession("yonghu", "user1", 1L, null));
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testValueMulDayAsYonghu() throws Exception {
+        when(rukuxinxiService.selectTimeStatValue(any(), any())).thenReturn(Collections.emptyList());
+        R result = controller.valueMulDay("colX", "day", "colY1,colY2",
+                ControllerTestSupport.mockRequestWithSession("yonghu", "user1", 1L, null));
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testSaveWithNullSkuSkipsStockUpdate() {
+        RukuxinxiEntity entity = new RukuxinxiEntity();
+        entity.setFuzhuangbianhao(null);
+        entity.setFuzhuangkucun(10);
+        R result = controller.save(entity, ControllerTestSupport.mockAdminRequest());
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testSaveWithNullUsernameSkipsAlert() {
+        RukuxinxiEntity entity = new RukuxinxiEntity();
+        entity.setFuzhuangbianhao("SP001");
+        entity.setFuzhuangkucun(10);
+        entity.setZhanghao(null);
+
+        ShangpinxinxiEntity product = new ShangpinxinxiEntity();
+        product.setFuzhuangkucun(5);
+        when(shangpinxinxiService.selectOne(any())).thenReturn(product);
+
+        R result = controller.save(entity,
+                ControllerTestSupport.mockRequestWithSession("yonghu", "user1", 1L, "张三"));
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testValueFromJsonCache() throws Exception {
+        String file = "value_rukuxinxi_colX_colY_timeType.json";
+        try {
+            ControllerTestSupport.writeJsonCache(file, "[{\"total\":99}]");
+            R result = controller.value("colY", "colX", ControllerTestSupport.mockAdminRequest());
+            assertEquals(0, result.get("code"));
+        } finally {
+            ControllerTestSupport.deleteJsonCache(file);
+        }
+    }
+
+    @Test
+    public void testValueMulFromJsonCache() throws Exception {
+        String file = "value_rukuxinxi_colX_colY1,colY2_timeType.json";
+        try {
+            ControllerTestSupport.writeJsonCache(file, "[{\"total\":1}]");
+            R result = controller.valueMul("colX", "colY1,colY2", ControllerTestSupport.mockAdminRequest());
+            assertEquals(0, result.get("code"));
+        } finally {
+            ControllerTestSupport.deleteJsonCache(file);
+        }
+    }
+
+    @Test
+    public void testValueDayFromJsonCache() throws Exception {
+        String file = "value_rukuxinxi_colX_colY_day.json";
+        try {
+            ControllerTestSupport.writeJsonCache(file, "[{\"total\":2}]");
+            R result = controller.valueDay("colY", "colX", "day", ControllerTestSupport.mockAdminRequest());
+            assertEquals(0, result.get("code"));
+        } finally {
+            ControllerTestSupport.deleteJsonCache(file);
+        }
+    }
+
+    @Test
+    public void testValueMulDayFromJsonCache() throws Exception {
+        String file = "value_rukuxinxi_colX_colY1,colY2_day.json";
+        try {
+            ControllerTestSupport.writeJsonCache(file, "[{\"total\":3}]");
+            R result = controller.valueMulDay("colX", "day", "colY1,colY2", ControllerTestSupport.mockAdminRequest());
+            assertEquals(0, result.get("code"));
+        } finally {
+            ControllerTestSupport.deleteJsonCache(file);
+        }
+    }
+
+    @Test
+    public void testGroupFromJsonCache() throws Exception {
+        String file = "group_rukuxinxi_status_timeType.json";
+        try {
+            ControllerTestSupport.writeJsonCache(file, "[{\"total\":4}]");
+            R result = controller.group("status", ControllerTestSupport.mockAdminRequest());
+            assertEquals(0, result.get("code"));
+        } finally {
+            ControllerTestSupport.deleteJsonCache(file);
+        }
+    }
+
+    @Test
+    public void testValueMulWithDatesInRows() throws Exception {
+        List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
+        Map<String, Object> row = new HashMap<String, Object>();
+        row.put("total", 10);
+        row.put("addtime", new Date());
+        rows.add(row);
+        when(rukuxinxiService.selectValue(any(), any())).thenReturn(rows);
+
+        R result = controller.valueMul("colX", "colY1,colY2", ControllerTestSupport.mockAdminRequest());
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testValueDayWithDatesInRows() throws Exception {
+        List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
+        Map<String, Object> row = new HashMap<String, Object>();
+        row.put("total", 10);
+        row.put("addtime", new Date());
+        rows.add(row);
+        when(rukuxinxiService.selectTimeStatValue(any(), any())).thenReturn(rows);
+
+        R result = controller.valueDay("colY", "colX", "day", ControllerTestSupport.mockAdminRequest());
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testValueMulDayWithDatesInRows() throws Exception {
+        List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
+        Map<String, Object> row = new HashMap<String, Object>();
+        row.put("total", 10);
+        row.put("addtime", new Date());
+        rows.add(row);
+        when(rukuxinxiService.selectTimeStatValue(any(), any())).thenReturn(rows);
+
+        R result = controller.valueMulDay("colX", "day", "colY1,colY2", ControllerTestSupport.mockAdminRequest());
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testGroupWithNonDateFields() throws Exception {
+        List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
+        Map<String, Object> row = new HashMap<String, Object>();
+        row.put("status", "ok");
+        rows.add(row);
+        when(rukuxinxiService.selectGroup(any(), any())).thenReturn(rows);
+
+        R result = controller.group("status", ControllerTestSupport.mockAdminRequest());
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testValueSortsMultipleRows() throws Exception {
+        List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
+        Map<String, Object> low = new HashMap<String, Object>();
+        low.put("total", 5);
+        rows.add(low);
+        Map<String, Object> high = new HashMap<String, Object>();
+        high.put("total", 50);
+        rows.add(high);
+        when(rukuxinxiService.selectValue(any(), any())).thenReturn(rows);
+
+        R result = controller.value("colY", "colX", ControllerTestSupport.mockAdminRequest());
+        assertEquals(0, result.get("code"));
+    }
 }

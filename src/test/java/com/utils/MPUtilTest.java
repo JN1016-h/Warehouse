@@ -154,6 +154,91 @@ public class MPUtilTest {
         assertNotNull(wrapper);
     }
 
+    @Test
+    public void testSort2Desc() {
+        Map<String, Object> params = new HashMap<>();
+        params.put("sort", "id");
+        params.put("order", "desc");
+        MPUtil.sort2(new EntityWrapper<>(), params);
+    }
+
+    @Test
+    public void testSort2Asc() {
+        Map<String, Object> params = new HashMap<>();
+        params.put("sort", "name");
+        params.put("order", "asc");
+        MPUtil.sort2(new EntityWrapper<>(), params);
+    }
+
+    @Test
+    public void testSortMultiColumnDesc() {
+        Map<String, Object> params = new HashMap<>();
+        params.put("sort", "id,name");
+        params.put("order", "desc,asc");
+        MPUtil.sort(new EntityWrapper<>(), params);
+    }
+
+    @Test
+    public void testGenLikeOrEqExactMatch() {
+        Map<String, Object> param = new HashMap<>();
+        param.put("status", "open");
+        EntityWrapper<SampleEntity> wrapper = new EntityWrapper<>();
+        MPUtil.genLikeOrEq(wrapper, param);
+        assertNotNull(wrapper.getSqlSegment());
+    }
+
+    @Test
+    public void testAllEq() {
+        SampleEntity entity = new SampleEntity();
+        entity.setUserName("alice");
+        entity.setStatus("open");
+        EntityWrapper<SampleEntity> wrapper = new EntityWrapper<>();
+        MPUtil.allEq(wrapper, entity);
+        assertNotNull(wrapper.getSqlSegment());
+    }
+
+    @Test
+    public void testBetweenBlankStartValue() {
+        EntityWrapper<SampleEntity> wrapper = new EntityWrapper<>();
+        Map<String, Object> params = new HashMap<>();
+        params.put("price_start", "  ");
+        params.put("price_end", "100");
+        MPUtil.between(wrapper, params);
+        assertNotNull(wrapper.getSqlSegment());
+    }
+
+    @Test
+    public void testCamelToUnderlineMapEmptyPre() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("userName", "bob");
+        Map result = MPUtil.camelToUnderlineMap(source, "");
+        assertEquals("bob", result.get("user_name"));
+    }
+
+    @Test
+    public void testSort2WithoutOrder() {
+        Map<String, Object> params = new HashMap<>();
+        params.put("sort", "id");
+        MPUtil.sort2(new EntityWrapper<>(), params);
+    }
+
+    @Test
+    public void testSortWithoutSortKey() {
+        Map<String, Object> params = new HashMap<>();
+        params.put("order", "asc");
+        MPUtil.sort(new EntityWrapper<>(), params);
+    }
+
+    @Test
+    public void testGenLikeMultipleEntries() {
+        Map<String, Object> param = new HashMap<>();
+        param.put("name", "ali");
+        param.put("status", "open");
+        EntityWrapper<SampleEntity> wrapper = new EntityWrapper<>();
+        MPUtil.genLike(wrapper, param);
+        assertNotNull(wrapper.getSqlSegment());
+    }
+
     public static class SampleEntity {
         private String userName;
         private String status;

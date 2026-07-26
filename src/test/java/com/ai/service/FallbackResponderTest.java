@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -250,5 +251,94 @@ public class FallbackResponderTest {
         m.put("paidCount", paidCount);
         m.put("unpaidCount", unpaidCount);
         return m;
+    }
+
+    @Test
+    public void respondSimpleInventoryNoLowStockTable() {
+        Map<String, Object> data = new LinkedHashMap<String, Object>();
+        data.put("hasData", true);
+        data.put("timeRange", "近月");
+        Map<String, Object> inventory = new LinkedHashMap<String, Object>();
+        inventory.put("totalSku", 1);
+        inventory.put("totalStock", 10);
+        inventory.put("outboundQtyInWindow", 1);
+        inventory.put("inboundQtyInWindow", 1);
+        inventory.put("lowStockTop", Collections.emptyList());
+        data.put("inventory", inventory);
+
+        String result = fallbackResponder.respond("库存", AiStyle.SIMPLE, data);
+        assertTrue(result.contains("库存摘要"));
+        assertFalse(result.contains("低库存"));
+    }
+
+    @Test
+    public void respondDetailedTurnoverWithoutCapital() {
+        Map<String, Object> data = new LinkedHashMap<String, Object>();
+        data.put("hasData", true);
+        data.put("timeRange", "近月");
+        Map<String, Object> turnover = new LinkedHashMap<String, Object>();
+        turnover.put("turnoverRate", 1.0);
+        turnover.put("turnoverDays", 30.0);
+        turnover.put("capitalNote", null);
+        data.put("turnover", turnover);
+
+        String result = fallbackResponder.respond("周转", AiStyle.DETAILED, data);
+        assertTrue(result.contains("周转概况"));
+        assertFalse(result.contains("资金占用"));
+    }
+
+    @Test
+    public void respondTableWithNullCellValues() {
+        Map<String, Object> data = new LinkedHashMap<String, Object>();
+        data.put("hasData", true);
+        data.put("timeRange", "近月");
+        Map<String, Object> sellThrough = new LinkedHashMap<String, Object>();
+        sellThrough.put("sellThroughRate", 50);
+        sellThrough.put("skusWithOutbound", 1);
+        sellThrough.put("totalSku", 2);
+        sellThrough.put("formula", "f");
+        List<Map<String, Object>> slowTop = new ArrayList<Map<String, Object>>();
+        Map<String, Object> row = new LinkedHashMap<String, Object>();
+        row.put("sku", "S1");
+        row.put("name", null);
+        row.put("coefficient", null);
+        row.put("outboundQty", 1);
+        row.put("level", "滞销");
+        slowTop.add(row);
+        sellThrough.put("slowTop", slowTop);
+        data.put("sellThrough", sellThrough);
+
+        String result = fallbackResponder.respond("动销", AiStyle.DETAILED, data);
+        assertTrue(result.contains("S1"));
+    }
+
+    @Test
+    public void respondRiskDetailedWithNote() {
+        Map<String, Object> data = new LinkedHashMap<String, Object>();
+        data.put("hasData", true);
+        data.put("timeRange", "近月");
+        Map<String, Object> risk = new LinkedHashMap<String, Object>();
+        risk.put("note", "风险备注说明");
+        risk.put("overstockTop", Collections.emptyList());
+        risk.put("stockoutTop", Collections.emptyList());
+        data.put("risk", risk);
+
+        String result = fallbackResponder.respond("风险", AiStyle.DETAILED, data);
+        assertTrue(result.contains("风险备注说明"));
+    }
+
+    @Test
+    public void respondSimpleTurnoverWithoutCapitalNote() {
+        Map<String, Object> data = new LinkedHashMap<String, Object>();
+        data.put("hasData", true);
+        data.put("timeRange", "近月");
+        Map<String, Object> turnover = new LinkedHashMap<String, Object>();
+        turnover.put("turnoverRate", 1.2);
+        turnover.put("turnoverDays", 25.0);
+        data.put("turnover", turnover);
+
+        String result = fallbackResponder.respond("周转", AiStyle.SIMPLE, data);
+        assertTrue(result.contains("周转概况"));
+        assertFalse(result.contains("说明："));
     }
 }

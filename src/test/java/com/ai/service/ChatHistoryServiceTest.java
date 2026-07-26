@@ -172,4 +172,93 @@ public class ChatHistoryServiceTest {
         verify(sessionDao).insert(captor.capture());
         assertEquals("新对话", captor.getValue().getTitle());
     }
+
+    @Test
+    public void getOrCreateSessionUpdatesStyleOnExisting() {
+        AiChatSessionEntity existing = new AiChatSessionEntity();
+        existing.setId(10L);
+        existing.setUserId(1L);
+        when(sessionDao.selectById(10L)).thenReturn(existing);
+
+        chatHistoryService.getOrCreateSession(10L, 1L, "yonghu", "DETAILED", "q");
+
+        assertEquals("DETAILED", existing.getStyle());
+    }
+
+    @Test
+    public void getOrCreateSessionNullUserIdCreatesNew() {
+        AiChatSessionEntity existing = new AiChatSessionEntity();
+        existing.setId(10L);
+        existing.setUserId(1L);
+        when(sessionDao.selectById(10L)).thenReturn(existing);
+
+        chatHistoryService.getOrCreateSession(10L, null, "yonghu", "SIMPLE", "q");
+
+        verify(sessionDao).insert(any(AiChatSessionEntity.class));
+    }
+
+    @Test
+    public void saveMessageNotDegraded() {
+        AiChatMessageEntity result = chatHistoryService.saveMessage(
+                5L, "user", "question", null, false, "GENERAL");
+        assertEquals(0, result.getDegraded().intValue());
+    }
+
+    @Test
+    public void listSessionsNullListFromDao() {
+        when(sessionDao.selectList(any(EntityWrapper.class))).thenReturn(null);
+        assertTrue(chatHistoryService.listSessions(1L).isEmpty());
+    }
+
+    @Test
+    public void listMessagesNullUserId() {
+        AiChatSessionEntity session = new AiChatSessionEntity();
+        session.setUserId(2L);
+        when(sessionDao.selectById(1L)).thenReturn(session);
+
+        assertTrue(chatHistoryService.listMessages(1L, null).isEmpty());
+    }
+
+    @Test
+    public void listMessagesNullListFromDao() {
+        AiChatSessionEntity session = new AiChatSessionEntity();
+        session.setUserId(2L);
+        when(sessionDao.selectById(1L)).thenReturn(session);
+        when(messageDao.selectList(any(EntityWrapper.class))).thenReturn(null);
+
+        assertTrue(chatHistoryService.listMessages(1L, 2L).isEmpty());
+    }
+
+    @Test
+    public void getMessageNullSession() {
+        AiChatMessageEntity msg = new AiChatMessageEntity();
+        msg.setSessionId(5L);
+        when(messageDao.selectById(1L)).thenReturn(msg);
+        when(sessionDao.selectById(5L)).thenReturn(null);
+
+        assertNull(chatHistoryService.getMessage(1L, 2L));
+    }
+
+    @Test
+    public void getMessageNullUserId() {
+        AiChatMessageEntity msg = new AiChatMessageEntity();
+        msg.setSessionId(5L);
+        when(messageDao.selectById(1L)).thenReturn(msg);
+        AiChatSessionEntity session = new AiChatSessionEntity();
+        session.setUserId(2L);
+        when(sessionDao.selectById(5L)).thenReturn(session);
+
+        assertNull(chatHistoryService.getMessage(1L, null));
+    }
+
+    @Test
+    public void truncateShortTitleNoEllipsis() {
+        when(sessionDao.selectById(any())).thenReturn(null);
+        ArgumentCaptor<AiChatSessionEntity> captor = ArgumentCaptor.forClass(AiChatSessionEntity.class);
+
+        chatHistoryService.getOrCreateSession(null, 1L, "yonghu", "SIMPLE", "短标题");
+
+        verify(sessionDao).insert(captor.capture());
+        assertEquals("短标题", captor.getValue().getTitle());
+    }
 }

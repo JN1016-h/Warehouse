@@ -182,4 +182,91 @@ public class UsersControllerTest {
         R result = controller.update(user);
         assertEquals(500, result.get("code"));
     }
+
+    @Test
+    public void testLoginPlaintextPasswordMigration() {
+        UsersEntity user = new UsersEntity();
+        user.setId(1L);
+        user.setUsername("legacy");
+        user.setPassword("plainpass");
+        user.setRole("管理员");
+        when(userService.selectOne(any())).thenReturn(user);
+        when(tokenService.generateToken(anyLong(), anyString(), anyString(), anyString())).thenReturn("token");
+
+        R result = controller.login("legacy", "plainpass", null, null, ControllerTestSupport.mockAdminRequest());
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testRegisterWithPassword() {
+        UsersEntity user = new UsersEntity();
+        user.setUsername("newadmin");
+        user.setPassword("secret");
+        when(userService.selectOne(any())).thenReturn(null);
+
+        R result = controller.register(user);
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testRegisterWithoutPassword() {
+        UsersEntity user = new UsersEntity();
+        user.setUsername("nopass");
+        when(userService.selectOne(any())).thenReturn(null);
+
+        R result = controller.register(user);
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testLoginViaBody() {
+        UsersEntity user = new UsersEntity();
+        user.setId(1L);
+        user.setUsername("admin2");
+        user.setPassword(EncryptUtil.md5("123456"));
+        user.setRole("管理员");
+        when(userService.selectOne(any())).thenReturn(user);
+        when(tokenService.generateToken(anyLong(), anyString(), anyString(), anyString())).thenReturn("token");
+
+        com.dto.LoginRequest body = new com.dto.LoginRequest();
+        body.setUsername("admin2");
+        body.setPassword("123456");
+
+        R result = controller.login(null, null, null, body, ControllerTestSupport.mockAdminRequest());
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testLoginBlankUsernameOnly() {
+        R result = controller.login("", "pass", null, null, ControllerTestSupport.mockAdminRequest());
+        assertEquals(500, result.get("code"));
+    }
+
+    @Test
+    public void testLoginBlankPasswordOnly() {
+        R result = controller.login("admin", "", null, null, ControllerTestSupport.mockAdminRequest());
+        assertEquals(500, result.get("code"));
+    }
+
+    @Test
+    public void testLoginWrongPasswordAfterPlaintextMigration() {
+        UsersEntity user = new UsersEntity();
+        user.setUsername("admin");
+        user.setPassword(EncryptUtil.md5("correct"));
+        when(userService.selectOne(any())).thenReturn(user);
+
+        R result = controller.login("admin", "wrong", null, null, ControllerTestSupport.mockAdminRequest());
+        assertEquals(500, result.get("code"));
+    }
+
+    @Test
+    public void testLoginStoredPasswordNull() {
+        UsersEntity user = new UsersEntity();
+        user.setUsername("ghost");
+        user.setPassword(null);
+        when(userService.selectOne(any())).thenReturn(user);
+
+        R result = controller.login("ghost", "pass", null, null, ControllerTestSupport.mockAdminRequest());
+        assertEquals(500, result.get("code"));
+    }
 }
