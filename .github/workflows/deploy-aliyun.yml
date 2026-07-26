@@ -52,9 +52,13 @@ jobs:
 
       - name: Pack source
         run: |
+          # Tarball must live in GITHUB_WORKSPACE. appleboy/scp-action runs in Docker
+          # and only mounts the workspace; host /tmp is invisible (causes empty archive).
           tar --exclude='./.git' --exclude='**/node_modules' --exclude='./target' \
-              -czf /tmp/warehouse-src.tgz .
-          ls -lh /tmp/warehouse-src.tgz
+              --exclude='./warehouse-src.tgz' \
+              -czf warehouse-src.tgz .
+          ls -lh warehouse-src.tgz
+          test -s warehouse-src.tgz
 
       - name: Upload tarball
         uses: appleboy/scp-action@v0.1.7
@@ -64,7 +68,7 @@ jobs:
           key: ${{ secrets.ALIYUN_SSH_KEY }}
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
-          source: "/tmp/warehouse-src.tgz"
+          source: "warehouse-src.tgz"
           target: "/tmp/"
           overwrite: true
 
