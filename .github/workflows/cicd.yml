@@ -567,7 +567,10 @@ jobs:
           if [ "${{ vars.SONAR_ENABLED }}" = "true" ]; then
             echo "SonarQube: ${{ secrets.SONAR_HOST_URL }}/dashboard?id=warehouse-management" >> "$GITHUB_STEP_SUMMARY"
           fi
-          ls -lah dashboard | head -50
+          # Avoid `ls | head` under pipefail (SIGPIPE → exit 141/2)
+          ls -lah dashboard > "$RUNNER_TEMP/dashboard-ls.txt" || true
+          head -n 50 "$RUNNER_TEMP/dashboard-ls.txt" || true
+          echo "dashboard_files=$(find dashboard -type f | wc -l)"
 
       - name: Upload HTML dashboard
         if: always()
@@ -582,7 +585,7 @@ jobs:
   publish_reports:
     name: publish_reports
     needs: html_dashboard
-    if: ${{ always() && vars.REPORTS_SYNC_ENABLED == 'true' }}
+    if: ${{ always() && vars.REPORTS_SYNC_ENABLED == 'true' && needs.html_dashboard.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Write SSH key
@@ -603,14 +606,14 @@ jobs:
         with:
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
-          key: ${{ secrets.ALIYUN_SSH_KEY }}
+          key_path: ${{ github.workspace }}/.ssh_deploy_key
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
-          source: "dashboard/*"
-          target: "${{ vars.REPORTS_REMOTE_DIR || '/opt/ci-reports' }}/${{ github.run_number }}/"
-          strip_components: 1
+          source: "dashboard"
+          target: "${{ vars.REPORTS_REMOTE_DIR || '/opt/ci-reports' }}/${{ github.run_number }}"
+          overwrite: true
 
-      - name: Point latest symlink + summary
+      - name: Point latest + refresh index
         uses: appleboy/ssh-action@v1.2.1
         env:
           RUN_ID: ${{ github.run_number }}
@@ -619,7 +622,7 @@ jobs:
         with:
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
-          key: ${{ secrets.ALIYUN_SSH_KEY }}
+          key_path: ${{ github.workspace }}/.ssh_deploy_key
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
           envs: RUN_ID,REPORTS_REMOTE_DIR,REPORTS_HTTP_PORT
@@ -627,9 +630,33 @@ jobs:
             set -euo pipefail
             RD="${REPORTS_REMOTE_DIR:-/opt/ci-reports}"
             mkdir -p "${RD}"
+            # scp may nest as ${RD}/${RUN_ID}/dashboard — normalize
+            if [ -d "${RD}/${RUN_ID}/dashboard" ] && [ ! -f "${RD}/${RUN_ID}/index.html" ]; then
+              shopt -s dotglob
+              mv "${RD}/${RUN_ID}/dashboard"/* "${RD}/${RUN_ID}/" 2>/dev/null || true
+              rmdir "${RD}/${RUN_ID}/dashboard" 2>/dev/null || true
+            fi
             ln -sfn "${RD}/${RUN_ID}" "${RD}/latest"
-            echo "Reports URL path: /reports/latest/"
-            ls -lah "${RD}/latest" | head -20
+            cat > "${RD}/index.html" <<EOF
+            <html><body>
+            <h1>CI Reports</h1>
+            <p>Run ${RUN_ID}</p>
+            <ul>
+              <li><a href="./latest/index.html">Dashboard (latest)</a></li>
+              <li><a href="./latest/app-image.html">Trivy App Image</a></li>
+              <li><a href="./latest/jacoco/index.html">JaCoCo Coverage</a></li>
+              <li><a href="./latest/jmeter-dashboard/index.html">JMeter Charts</a></li>
+              <li><a href="./latest/k6-summary.html">k6 Perf</a></li>
+              <li><a href="./latest/sast-summary.html">SAST</a></li>
+              <li><a href="./latest/newman.html">Newman</a></li>
+              <li><a href="./latest/zap-report.html">ZAP DAST</a></li>
+            </ul>
+            </body></html>
+            EOF
+            # strip leading spaces from heredoc indent
+            sed -i 's/^            //' "${RD}/index.html"
+            echo "URL: http://<host>:${REPORTS_HTTP_PORT}/reports/latest/index.html"
+            find "${RD}/latest" -maxdepth 2 -type f -name '*.html' | head -n 30 || true
 
       - name: Remove SSH key
         if: always()
