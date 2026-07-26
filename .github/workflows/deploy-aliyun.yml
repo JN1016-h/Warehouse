@@ -1,11 +1,7 @@
-# CD after Cicd (SAST / unit / Trivy / Checkov / ZAP / k6 / JMeter / reports):
-# gate → sync → build → push-harbor → prepare-k8s → deploy-services(Java+FE) → deploy-gateway → verify
-# MySQL is intentionally NOT applied / restarted / rolled out.
 name: Deploy Aliyun
 
 on:
   workflow_dispatch:
-  # Auto-publish Java + frontend when Cicd completes successfully on master/main
   workflow_run:
     workflows: [Cicd]
     types: [completed]
@@ -60,7 +56,6 @@ jobs:
               -czf /tmp/warehouse-src.tgz .
           ls -lh /tmp/warehouse-src.tgz
 
-      # Prefer `key` over key_path — Dockerized appleboy cannot always read workspace 0600 files
       - name: Upload tarball
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -201,7 +196,6 @@ jobs:
             HU="${HARBOR_USER:-admin}"
             HPW="${HARBOR_PASSWORD:-Harbor12345}"
             kubectl apply -f "${KD}/namespace.yaml"
-            # Pull secret for app/frontend images — do NOT apply mysql.yaml / mysql-initdb
             kubectl -n "${NS}" create secret docker-registry harbor-cred \
               --docker-server="${HH}" \
               --docker-username="${HU}" \
@@ -247,7 +241,6 @@ jobs:
             TAG="build.${GITHUB_RUN_NUMBER}"
             IMAGE="${HH}/${HP}/warehouse-app:${TAG}"
             FE_IMAGE="${HH}/${HP}/warehouse-frontend:${TAG}"
-            # Only Java API + Vue frontend — never kubectl apply mysql.yaml here
             kubectl apply -f "${KD}/app.yaml"
             kubectl apply -f "${KD}/frontend.yaml"
             kubectl -n "${NS}" patch deployment warehouse-app --type strategic -p \
@@ -326,7 +319,6 @@ jobs:
       - name: Summary
         run: |
           cat >> "$GITHUB_STEP_SUMMARY" <<EOF
-          ## CD: Cicd → Harbor → Java + Frontend (MySQL untouched)
           - Images: \`121.40.253.17/warehouse/*:build.${{ github.run_number }}\`
           - Frontend: http://121.40.253.17:30080/
           - API: http://121.40.253.17:30081/springboot38hdw40x/

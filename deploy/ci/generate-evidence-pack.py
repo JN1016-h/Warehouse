@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Generate auditable evidence pack covering 5 test types for CI dashboard."""
 from __future__ import annotations
 
 import html

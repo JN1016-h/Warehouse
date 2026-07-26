@@ -1,8 +1,7 @@
 {
   "info": {
-    "name": "仓库管理系统-集成/接口测试",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "跨模块接口集成测试。context-path=/springboot38hdw40x。CI: Newman → reports/integration/newman.html"
+    "name": "warehouse-api",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {

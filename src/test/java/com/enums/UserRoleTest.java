@@ -1,11 +1,9 @@
 package com.enums;
 
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@DisplayName("UserRole 枚举单元测试")
 public class UserRoleTest {
 
     @Test

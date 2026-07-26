@@ -40,3 +40,9 @@ node_modules/
 deploy/.secrets/
 deploy/tmp-*.py
 
+### Docs (do not publish to GitHub) ###
+docs/
+*.md
+!src/main/resources/db/migration/README.md
+deploy/**/*.md
+

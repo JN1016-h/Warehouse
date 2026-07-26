@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""E2E：模拟真实用户跨前端+API 的关键旅程，输出可核查 HTML/JSON 证据。"""
 from __future__ import annotations
 
 import json

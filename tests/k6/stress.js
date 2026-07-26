@@ -1,9 +1,6 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 
-/**
- * 压力 / 负载：阶梯加压，输出 JSON 供 CI 生成曲线与瓶颈分析。
- */
 export const options = {
   stages: [
     { duration: '20s', target: 5 },

@@ -1,6 +1,3 @@
-# Warehouse CI — 五类测试全落地（证据可核查）
-# 1.Unit 2.Integration 3.E2E 4.Stress/Load 5.Security(SAST/DAST/容器/Sonar)
-# Jobs: sast → unit → integration → e2e → container_iac_scan → dast → performance → sonar → html_dashboard → publish_reports
 name: Cicd
 
 on:
@@ -23,7 +20,6 @@ env:
   ARTIFACT_RETENTION_DAYS: 7
 
 jobs:
-  # ---------- SAST (Gitleaks + Semgrep; Java/Vue stack, no Bandit/pip-audit) ----------
   sast:
     name: sast
     runs-on: ubuntu-latest
@@ -44,7 +40,6 @@ jobs:
       - name: Gitleaks (secrets)
         run: |
           mkdir -p reports/sast
-          # Soft-fail for legacy repo secrets; triage via artifact then tighten to exit-code 1
           gitleaks detect --source . --report-path reports/sast/gitleaks.json --report-format json --exit-code 0
           gitleaks detect --source . --report-path reports/sast/gitleaks.sarif --report-format sarif --exit-code 0 || true
 
@@ -77,7 +72,6 @@ jobs:
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
           if-no-files-found: warn
 
-  # ---------- Unit (Maven + JaCoCo coverage HTML) ----------
   unit:
     name: unit
     needs: sast
@@ -106,7 +100,6 @@ jobs:
           if [ -d target/site/jacoco ]; then
             cp -r target/site/jacoco reports/unit/jacoco
           fi
-          # 可核查执行结果摘要
           {
             echo "unit_job=${GITHUB_JOB}"
             echo "run_id=${GITHUB_RUN_ID}"
@@ -121,13 +114,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: unit-reports
-          # Only reports/unit (includes unit-summary.html + jacoco/) for stable dashboard paths
           path: reports/unit
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
           if-no-files-found: warn
 
-  # ---------- SonarQube (calls server-hosted Sonar) ----------
-  # Enable with repo Variable SONAR_ENABLED=true and Secrets SONAR_HOST_URL + SONAR_TOKEN
   sonar:
     name: sonar
     needs: unit
@@ -166,7 +156,6 @@ jobs:
           elif [ -d unit-art/reports/unit/jacoco ]; then
             cp -r unit-art/reports/unit/jacoco target/site/jacoco
           fi
-          # also accept jacoco.xml anywhere under unit-art
           if [ ! -f target/site/jacoco/jacoco.xml ]; then
             xml="$(find unit-art -name jacoco.xml 2>/dev/null | head -n1 || true)"
             if [ -n "${xml:-}" ]; then
@@ -244,7 +233,6 @@ jobs:
           echo "Dashboard: \`${{ secrets.SONAR_HOST_URL }}/dashboard?id=warehouse-management\`" >> "$GITHUB_STEP_SUMMARY"
           echo "Hotspots: \`${{ secrets.SONAR_HOST_URL }}/security_hotspots?id=warehouse-management\`" >> "$GITHUB_STEP_SUMMARY"
 
-  # ---------- Integration (Compose stack + Newman) ----------
   integration:
     name: integration
     needs: unit
@@ -326,7 +314,6 @@ jobs:
           docker rm -f warehouse-app-ci mysql-ci 2>/dev/null || true
           docker network rm ci-app-net 2>/dev/null || true
 
-  # ---------- E2E：真实用户流程（前端 + API）----------
   e2e:
     name: e2e
     needs: integration
@@ -398,7 +385,6 @@ jobs:
           docker rm -f warehouse-fe-ci warehouse-app-ci mysql-ci 2>/dev/null || true
           docker network rm ci-app-net 2>/dev/null || true
 
-  # ---------- Container + IaC (Trivy + Checkov) ----------
   container_iac_scan:
     name: container_iac_scan
     needs: [integration, e2e]
@@ -474,7 +460,6 @@ jobs:
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
           if-no-files-found: warn
 
-  # ---------- DAST (OWASP ZAP) ----------
   dast:
     name: dast
     needs: container_iac_scan
@@ -515,7 +500,6 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p reports/dast
-          # ZAP container user must be able to write HTML/JSON into the mount
           chmod 777 reports/dast
           docker run --rm --network host \
             -v "$GITHUB_WORKSPACE/reports/dast:/zap/wrk:rw" \
@@ -526,7 +510,6 @@ jobs:
             -J zap-report.json \
             -I || true
           ls -lah reports/dast || true
-          # Fail soft but surface missing HTML clearly
           if [ ! -f reports/dast/zap-report.html ]; then
             echo "<html><body><h1>ZAP report missing</h1><p>Baseline did not write zap-report.html. Check job logs.</p></body></html>" \
               > reports/dast/zap-report.html
@@ -547,7 +530,6 @@ jobs:
           docker rm -f warehouse-app-ci mysql-ci 2>/dev/null || true
           docker network rm ci-app-net 2>/dev/null || true
 
-  # ---------- Performance (k6 + JMeter) ----------
   performance:
     name: performance
     needs: dast
@@ -609,7 +591,6 @@ jobs:
         run: |
           mkdir -p reports/perf/jmeter tests/jmeter/output reports/perf/jmeter-dashboard
           cp tests/jmeter/warehouse-load.jmx /tmp/warehouse-load.ci.jmx
-          # Point plan at local CI app (rewrite common host/port placeholders)
           sed -i 's#<stringProp name="HTTPSampler.domain">[^<]*</stringProp>#<stringProp name="HTTPSampler.domain">127.0.0.1</stringProp>#g' /tmp/warehouse-load.ci.jmx
           sed -i 's#<stringProp name="HTTPSampler.port">[^<]*</stringProp>#<stringProp name="HTTPSampler.port">8080</stringProp>#g' /tmp/warehouse-load.ci.jmx
           jmeter -n -t /tmp/warehouse-load.ci.jmx \
@@ -646,7 +627,6 @@ jobs:
           docker rm -f warehouse-app-ci mysql-ci 2>/dev/null || true
           docker network rm ci-app-net 2>/dev/null || true
 
-  # ---------- Unified HTML dashboard (like reference doc screenshots) ----------
   html_dashboard:
     name: html_dashboard
     needs: [sast, unit, integration, e2e, container_iac_scan, dast, performance, sonar]
@@ -655,14 +635,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # v4: pattern 匹配多个 artifact 时必须 merge-multiple:true，或直接不写 pattern 下载全部
       - name: Download all report artifacts
         continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           path: collected
-          # 每个 artifact 解压到 collected/<artifact-name>/
-          # 不使用 pattern，避免「多匹配 + merge-multiple:false」直接失败
 
       - name: Assemble dashboard
         run: |
@@ -674,20 +651,16 @@ jobs:
             ls -lah dashboard
             exit 0
           fi
-          # Flatten known HTML files into dashboard/
           find collected -type f \( -name '*.html' -o -name '*.htm' \) 2>/dev/null | while read -r f; do
             base="$(basename "$f")"
             rel="$(echo "$f" | sed 's#^collected/##' | tr '/' '_')"
             cp "$f" "dashboard/${rel}"
           done
-          # Prefer short names for key pages (artifact layouts vary by upload path)
           cp collected/sast-reports/sast-summary.html dashboard/sast-summary.html 2>/dev/null || true
           cp collected/sast-reports/reports/sast/sast-summary.html dashboard/sast-summary.html 2>/dev/null || true
-          # unit artifact is uploaded as reports/unit + target/... → collected/unit-reports/reports/unit/...
           cp collected/unit-reports/unit-summary.html dashboard/unit-summary.html 2>/dev/null || true
           cp collected/unit-reports/reports/unit/unit-summary.html dashboard/unit-summary.html 2>/dev/null || true
           find collected/unit-reports -type f -name 'unit-summary.html' -exec cp {} dashboard/unit-summary.html \; 2>/dev/null || true
-          # JaCoCo HTML coverage
           if [ -d collected/unit-reports/target/site/jacoco ]; then
             cp -r collected/unit-reports/target/site/jacoco dashboard/jacoco
           elif [ -d collected/unit-reports/reports/unit/jacoco ]; then
@@ -698,7 +671,6 @@ jobs:
             cp -r collected/unit-reports/unit/jacoco dashboard/jacoco
           fi
           cp collected/integration-reports/newman.html dashboard/newman.html 2>/dev/null || true
-          # ZAP artifact is reports/dast → collected/dast-zap-reports/...
           cp collected/dast-zap-reports/zap-report.html dashboard/zap-report.html 2>/dev/null || true
           cp collected/dast-zap-reports/reports/dast/zap-report.html dashboard/zap-report.html 2>/dev/null || true
           find collected -type f \( -iname 'zap-report.html' -o -iname 'zap*.html' \) -exec cp {} dashboard/zap-report.html \; 2>/dev/null || true
@@ -711,22 +683,18 @@ jobs:
           cp collected/sonar-reports/sonar-summary.html dashboard/sonar-summary.html 2>/dev/null || true
           cp collected/performance-reports/k6/k6-summary.html dashboard/k6-summary.html 2>/dev/null || true
           cp collected/performance-reports/jmeter/jmeter-summary.html dashboard/jmeter-summary.html 2>/dev/null || true
-          # E2E
           cp collected/e2e-reports/e2e-summary.html dashboard/e2e-summary.html 2>/dev/null || true
           cp collected/e2e-reports/e2e-results.json dashboard/e2e-results.json 2>/dev/null || true
           cp collected/e2e-reports/e2e-run.log dashboard/e2e-run.log 2>/dev/null || true
           find collected/e2e-reports -type f -name 'e2e-summary.html' -exec cp {} dashboard/e2e-summary.html \; 2>/dev/null || true
-          # JMeter official dashboard
           if [ -d collected/performance-reports/jmeter-dashboard ]; then
             cp -r collected/performance-reports/jmeter-dashboard dashboard/jmeter-dashboard
           fi
-          # Trivy / Checkov html from container artifact
           for f in collected/container-iac-reports/html/*.html collected/container-iac-reports/trivy/*.html collected/container-iac-reports/checkov/*.html; do
             [ -f "$f" ] || continue
             cp "$f" "dashboard/$(basename "$f")"
           done
 
-          # Also promote flatten-named copies if short names still missing
           [ -f dashboard/unit-summary.html ] || cp dashboard/unit-reports_reports_unit_unit-summary.html dashboard/unit-summary.html 2>/dev/null || true
           [ -f dashboard/sast-summary.html ] || cp dashboard/sast-reports_sast-summary.html dashboard/sast-summary.html 2>/dev/null || true
           [ -f dashboard/zap-report.html ] || cp dashboard/dast-zap-reports_zap-report.html dashboard/zap-report.html 2>/dev/null || true
@@ -759,7 +727,6 @@ jobs:
           if [ "${{ vars.SONAR_ENABLED }}" = "true" ]; then
             echo "SonarQube: ${{ secrets.SONAR_HOST_URL }}/dashboard?id=warehouse-management" >> "$GITHUB_STEP_SUMMARY"
           fi
-          # Avoid `ls | head` under pipefail (SIGPIPE → exit 141/2)
           ls -lah dashboard > "$RUNNER_TEMP/dashboard-ls.txt" || true
           head -n 50 "$RUNNER_TEMP/dashboard-ls.txt" || true
           echo "dashboard_files=$(find dashboard -type f | wc -l)"
@@ -773,7 +740,6 @@ jobs:
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
           if-no-files-found: warn
 
-  # ---------- Publish HTML reports to server nginx (/reports) ----------
   publish_reports:
     name: publish_reports
     needs: html_dashboard
@@ -786,8 +752,6 @@ jobs:
           name: ci-html-dashboard
           path: dashboard
 
-      # Use `key` (not key_path): scp-action runs in Docker and often cannot read
-      # workspace files written as mode 0600 → "getKeyFile ... permission denied"
       - name: Sync reports to server nginx volume
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -817,16 +781,12 @@ jobs:
             set -euo pipefail
             RD="${REPORTS_REMOTE_DIR:-/opt/ci-reports}"
             mkdir -p "${RD}"
-            # scp may nest as ${RD}/${RUN_ID}/dashboard — normalize
             if [ -d "${RD}/${RUN_ID}/dashboard" ] && [ ! -f "${RD}/${RUN_ID}/index.html" ]; then
               shopt -s dotglob
               mv "${RD}/${RUN_ID}/dashboard"/* "${RD}/${RUN_ID}/" 2>/dev/null || true
               rmdir "${RD}/${RUN_ID}/dashboard" 2>/dev/null || true
             fi
-            # If latest is already a directory, ln -sfn creates latest/<run> instead of replacing it
             rm -rf "${RD}/latest"
-            # Relative symlink so it resolves inside the nginx container bind-mount
-            # (absolute /opt/ci-reports/... does not exist in-container)
             ln -sfn "${RUN_ID}" "${RD}/latest"
             test -L "${RD}/latest"
             test -f "${RD}/latest/index.html"
@@ -852,7 +812,6 @@ jobs:
             </ul>
             </body></html>
             EOF
-            # strip leading spaces from heredoc indent
             sed -i 's/^            //' "${RD}/index.html"
             echo "URL: http://<host>:${REPORTS_HTTP_PORT}/reports/latest/index.html"
             find "${RD}/latest" -maxdepth 2 -type f -name '*.html' > /tmp/ci-reports-html-list.txt || true
