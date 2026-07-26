@@ -127,7 +127,7 @@ jobs:
           # sanity: summary must not stay at zero when XML exists
           grep -q 'No surefire XML found' reports/unit/unit-summary.html && \
             ls reports/unit/surefire/TEST-*.xml >/dev/null 2>&1 && \
-            echo "::warning::surefire XML present but summary empty �?check parser" || true
+            echo "::warning::surefire XML present but summary empty - check parser" || true
 
       - name: Upload unit reports
         if: always()
@@ -613,24 +613,24 @@ jobs:
           [ -f dashboard/e2e-summary.html ] || cp dashboard/e2e-reports_e2e-summary.html dashboard/e2e-summary.html 2>/dev/null || true
 
           python3 ci/generate-html-reports.py index dashboard \
-            "Evidence|五类测试证据总览|evidence-index.html|Unit/Integration/E2E/Perf/Security 可核查入�? \
-            "Unit|Unit Test Summary|unit-summary.html|Maven Surefire 完整用例结果" \
-            "Unit|JaCoCo Coverage Report|jacoco/index.html|语句/分支覆盖�? \
-            "Integration|Newman API Report|newman.html|跨模块接口集�? \
-            "E2E|User Journey E2E|e2e-summary.html|真实用户流程 PASS/FAIL" \
+            "Evidence|????????????|evidence-index.html|Unit/Integration/E2E/Perf/Security ???????? \
+            "Unit|Unit Test Summary|unit-summary.html|Maven Surefire ?????????" \
+            "Unit|JaCoCo Coverage Report|jacoco/index.html|???/???????? \
+            "Integration|Newman API Report|newman.html|??????????? \
+            "E2E|User Journey E2E|e2e-summary.html|????????? PASS/FAIL" \
             "SAST|SAST Security Scan Summary|sast-summary.html|Gitleaks + Semgrep" \
-            "Container|Trivy App Image|app-image.html|镜像漏洞分级" \
-            "Container|Trivy Frontend Image|frontend-image.html|前端镜像扫描" \
-            "Container|Trivy Filesystem|fs.html|依赖/配置扫描" \
-            "IaC|Checkov Kubernetes|k8s.html|K8s 配置检�? \
-            "DAST|OWASP ZAP Report|zap-report.html|动态扫�?HTML" \
-            "Security|Security Evidence Pack|security-evidence.html|漏洞清单与复测核�? \
-            "Performance|K6 Summary|k6-summary.html|延迟 p50/p95/压力阶梯" \
-            "Performance|JMeter Summary|jmeter-summary.html|JTL 汇�? \
-            "Performance|JMeter Dashboard|jmeter-dashboard/index.html|吞吐/响应时间曲线" \
-            "Performance|Bottleneck Analysis|perf-analysis.html|瓶颈与优化方�? \
+            "Container|Trivy App Image|app-image.html|?????????" \
+            "Container|Trivy Frontend Image|frontend-image.html|?????????" \
+            "Container|Trivy Filesystem|fs.html|???/??????" \
+            "IaC|Checkov Kubernetes|k8s.html|K8s ??????? \
+            "DAST|OWASP ZAP Report|zap-report.html|???????HTML" \
+            "Security|Security Evidence Pack|security-evidence.html|?????????????? \
+            "Performance|K6 Summary|k6-summary.html|??? p50/p95/??????" \
+            "Performance|JMeter Summary|jmeter-summary.html|JTL ???? \
+            "Performance|JMeter Dashboard|jmeter-dashboard/index.html|???/?????????" \
+            "Performance|Bottleneck Analysis|perf-analysis.html|??????????? \
             "Sonar|SonarQube Measures|sonar-summary.html|Bugs/Vulns/Hotspots/Coverage" \
-            "Sonar|SonarQube Dashboard|${{ secrets.SONAR_HOST_URL }}/dashboard?id=warehouse-management|服务�?Sonar"
+            "Sonar|SonarQube Dashboard|${{ secrets.SONAR_HOST_URL }}/dashboard?id=warehouse-management|?????Sonar"
 
           python3 ci/generate-evidence-pack.py dashboard
 
@@ -707,7 +707,7 @@ jobs:
             <h1>CI Reports</h1>
             <p>Run ${RUN_ID}</p>
             <ul>
-              <li><a href="./latest/evidence-index.html">五类测试证据总览</a></li>
+              <li><a href="./latest/evidence-index.html">????????????</a></li>
               <li><a href="./latest/index.html">Dashboard (latest)</a></li>
               <li><a href="./latest/unit-summary.html">Unit Summary</a></li>
               <li><a href="./latest/jacoco/index.html">JaCoCo Coverage</a></li>
