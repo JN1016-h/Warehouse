@@ -59,7 +59,7 @@ spec:
         - name: harbor-cred
       containers:
         - name: app
-          # CD: 121.40.253.17/warehouse/warehouse-app:build.<run_number>
+          # Default :latest for manual apply. CD substitutes unique tag build.<run>-<sha7>.
           image: 121.40.253.17/warehouse/warehouse-app:latest
           imagePullPolicy: Always
           ports:

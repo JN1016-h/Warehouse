@@ -88,7 +88,7 @@ jobs:
             sed -i 's/\r$//' "$DP"/k8s/*.sh || true
             chmod +x "$DP"/k8s/*.sh
             test -f "$DP/Dockerfile" && test -f "$DP/k8s/apply-stack.sh"
-            echo "== sync ok â†?${DP}"
+            echo "== sync ok path=${DP}"
 
   build:
     name: build
@@ -117,6 +117,7 @@ jobs:
             HH="${HARBOR_HOST:-121.40.253.17}"
             HP="${HARBOR_PROJECT:-warehouse}"
             SHORT="$(printf '%s' "${GITHUB_SHA}" | cut -c1-7)"
+            # Unique per CD run: build.<deploy-run>-<sha7> (immutable Harbor tag)
             TAG="build.${GITHUB_RUN_NUMBER}-${SHORT}"
             IMAGE="${HH}/${HP}/warehouse-app:${TAG}"
             FE_IMAGE="${HH}/${HP}/warehouse-frontend:${TAG}"
@@ -126,7 +127,10 @@ jobs:
             echo "${IMAGE}" > /tmp/warehouse-app.image
             echo "${FE_IMAGE}" > /tmp/warehouse-frontend.image
             echo "${TAG}" > /tmp/warehouse-image.tag
-            echo "== BUILD ok ${IMAGE} ${FE_IMAGE}"
+            printf '%s\n' "${TAG}" > /tmp/warehouse-image.tag.txt
+            echo "== BUILD ok tag=${TAG}"
+            echo "== app=${IMAGE}"
+            echo "== fe=${FE_IMAGE}"
 
   push-harbor:
     name: push-harbor
@@ -205,7 +209,7 @@ jobs:
               --docker-password="${HPW}" \
               --dry-run=client -o yaml | kubectl apply -f -
             if kubectl -n "${NS}" get deploy mysql >/dev/null 2>&1; then
-              echo "== mysql already present â€?leaving untouched"
+              echo "== mysql already present ?leaving untouched"
               kubectl -n "${NS}" get deploy,pods -l app=mysql -o wide || true
             else
               echo "::warning::mysql deployment not found in ${NS}; app will need an existing DB endpoint"
@@ -217,7 +221,7 @@ jobs:
     needs: prepare-k8s
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy Java + frontend only (Harbor â†?k8s)
+      - name: Deploy Java + frontend with unique Harbor tag
         uses: appleboy/ssh-action@v1.2.1
         env:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
@@ -242,12 +246,28 @@ jobs:
             NS="${NAMESPACE:-warehouse}"
             IMAGE="$(cat /tmp/warehouse-app.image)"
             FE_IMAGE="$(cat /tmp/warehouse-frontend.image)"
-            kubectl apply -f "${KD}/app.yaml"
-            kubectl apply -f "${KD}/frontend.yaml"
+            TAG="$(cat /tmp/warehouse-image.tag)"
+            echo "== deploy unique tag=${TAG}"
+            echo "== app=${IMAGE}"
+            echo "== fe=${FE_IMAGE}"
+
+            # Apply manifests with THIS run's immutable tag (never leave cluster on :latest)
+            tmp_app="$(mktemp)"
+            tmp_fe="$(mktemp)"
+            sed -E "s|image:[[:space:]]*[^[:space:]]*warehouse-app:[^[:space:]]*|image: ${IMAGE}|" \
+              "${KD}/app.yaml" >"${tmp_app}"
+            sed -E "s|image:[[:space:]]*[^[:space:]]*warehouse-frontend:[^[:space:]]*|image: ${FE_IMAGE}|" \
+              "${KD}/frontend.yaml" >"${tmp_fe}"
+            grep -E 'image:' "${tmp_app}" "${tmp_fe}"
+            kubectl apply -f "${tmp_app}"
+            kubectl apply -f "${tmp_fe}"
+            rm -f "${tmp_app}" "${tmp_fe}"
+
             kubectl -n "${NS}" patch deployment warehouse-app --type strategic -p \
               '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"harbor-cred"}]}}}}'
             kubectl -n "${NS}" patch deployment warehouse-frontend --type strategic -p \
               '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"harbor-cred"}]}}}}'
+            # Belt-and-suspenders: force Deployment image to unique Harbor refs
             kubectl set image "deployment/warehouse-app" "app=${IMAGE}" -n "${NS}"
             kubectl set image "deployment/warehouse-frontend" "frontend=${FE_IMAGE}" -n "${NS}"
             kubectl -n "${NS}" patch deployment warehouse-app -p \
@@ -255,15 +275,25 @@ jobs:
             kubectl -n "${NS}" patch deployment warehouse-frontend -p \
               '{"spec":{"template":{"spec":{"containers":[{"name":"frontend","imagePullPolicy":"Always"}]}}}}'
             kubectl -n "${NS}" annotate deployment warehouse-app warehouse-frontend \
+              "warehouse.io/image-tag=${TAG}" \
               "kubectl.kubernetes.io/restartedAt=$(date -u +%Y-%m-%dT%H:%M:%SZ)" --overwrite
+
             kubectl rollout status "deployment/warehouse-app" -n "${NS}" --timeout=600s
             kubectl rollout status "deployment/warehouse-frontend" -n "${NS}" --timeout=600s
+
+            APP_LIVE="$(kubectl -n "${NS}" get deploy warehouse-app -o jsonpath='{.spec.template.spec.containers[0].image}')"
+            FE_LIVE="$(kubectl -n "${NS}" get deploy warehouse-frontend -o jsonpath='{.spec.template.spec.containers[0].image}')"
+            echo "== live app=${APP_LIVE}"
+            echo "== live fe=${FE_LIVE}"
+            [ "${APP_LIVE}" = "${IMAGE}" ] || { echo "::error::app image mismatch"; exit 1; }
+            [ "${FE_LIVE}" = "${FE_IMAGE}" ] || { echo "::error::frontend image mismatch"; exit 1; }
+
             PUB="${PUBLIC_HOST:-121.40.253.17}"
             curl -fsS "http://${PUB}:30081/springboot38hdw40x/config/list?page=1&limit=1" >/dev/null && echo API_OK
             curl -fsS -o /dev/null "http://${PUB}:30080/" && echo FE_OK
             kubectl get pods -n "${NS}" -o wide
             kubectl get deploy -n "${NS}" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.template.spec.containers[0].image}{"\n"}{end}'
-            echo "== deployed app=${IMAGE} fe=${FE_IMAGE} (mysql untouched)"
+            echo "== deployed tag=${TAG} (mysql untouched)"
 
   deploy-gateway:
     name: deploy-gateway
@@ -302,6 +332,7 @@ jobs:
         env:
           NAMESPACE: ${{ vars.K8S_NAMESPACE }}
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          PUBLIC_HOST: ${{ vars.PUBLIC_HOST || '121.40.253.17' }}
         with:
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
@@ -309,21 +340,31 @@ jobs:
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
           command_timeout: 10m
-          envs: NAMESPACE,GITHUB_RUN_NUMBER
+          envs: NAMESPACE,GITHUB_RUN_NUMBER,PUBLIC_HOST
           script: |
             set -euo pipefail
             NS="${NAMESPACE:-warehouse}"
+            TAG="$(cat /tmp/warehouse-image.tag 2>/dev/null || echo "build.${GITHUB_RUN_NUMBER}")"
+            IMAGE="$(cat /tmp/warehouse-app.image 2>/dev/null || true)"
+            FE_IMAGE="$(cat /tmp/warehouse-frontend.image 2>/dev/null || true)"
             kubectl get pods,svc,deploy -n "${NS}" -o wide
+            echo "== expected tag=${TAG}"
+            kubectl get deploy -n "${NS}" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.template.spec.containers[0].image}{"\n"}{end}'
             PUB="${PUBLIC_HOST:-121.40.253.17}"
             curl -fsS "http://${PUB}:30081/springboot38hdw40x/config/list?page=1&limit=1" && echo
             curl -fsS -o /dev/null "http://${PUB}:30080/" && echo FE_OK
-            echo "build=${GITHUB_RUN_NUMBER}"
+            echo "tag=${TAG}"
+            echo "app=${IMAGE}"
+            echo "fe=${FE_IMAGE}"
 
       - name: Summary
         run: |
-          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
-          - Images: \`121.40.253.17/warehouse/*:build.${{ github.run_number }}\`
-          - Frontend: http://121.40.253.17:30080/
-          - API: http://121.40.253.17:30081/springboot38hdw40x/
-          - MySQL: left as-is (not applied / not restarted)
-          EOF
+          {
+            echo "## Deploy Aliyun"
+            echo "- Unique Harbor tag format: \`build.<deploy-run>-<sha7>\` (immutable; also retags \`:latest\`)"
+            echo "- K8s deployments updated to that tag via rendered manifests + \`kubectl set image\`"
+            echo "- Frontend: http://121.40.253.17:30080/"
+            echo "- API: http://121.40.253.17:30081/springboot38hdw40x/"
+            echo "- MySQL: left as-is"
+            echo "- Deploy run: \`${{ github.run_number }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

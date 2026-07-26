@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Upload/build on host ‚Ü?push Harbor ‚Ü?k8s pulls from Harbor
+# Upload/build on host ù?push Harbor ù?k8s pulls from Harbor
 set -euo pipefail
 
 NS="${K8S_NAMESPACE:-warehouse}"
@@ -15,7 +15,7 @@ FE_IMAGE="${FE_IMAGE:-${HARBOR_HOST}/${HARBOR_PROJECT}/warehouse-frontend:${TAG}
 WAIT="${WAIT_TIMEOUT:-600s}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
 SKIP_PUSH="${SKIP_PUSH:-0}"
-# GitHub CD sets SKIP_MYSQL=1 ‚Ä?do not apply/restart MySQL
+# GitHub CD sets SKIP_MYSQL=1 ù?do not apply/restart MySQL
 SKIP_MYSQL="${SKIP_MYSQL:-1}"
 
 echo "== ns=${NS} harbor=${HARBOR_HOST}/${HARBOR_PROJECT} tag=${TAG}"
@@ -95,7 +95,7 @@ kubectl -n "${NS}" create secret docker-registry harbor-cred \
   --dry-run=client -o yaml | kubectl apply -f -
 
 if [ "${SKIP_MYSQL}" = "1" ]; then
-  echo "== SKIP_MYSQL=1 ‚Ä?leave MySQL deployment/config untouched"
+  echo "== SKIP_MYSQL=1 ù?leave MySQL deployment/config untouched"
   if kubectl -n "${NS}" get deploy mysql >/dev/null 2>&1; then
     kubectl -n "${NS}" get deploy,pods -l app=mysql -o wide || true
   else
@@ -112,9 +112,16 @@ else
   kubectl rollout status "deployment/mysql" -n "${NS}" --timeout="${WAIT}" || true
 fi
 
-# Patch manifests defaults then set image to Harbor refs (app + frontend only)
-kubectl apply -f "${KD}/app.yaml"
-kubectl apply -f "${KD}/frontend.yaml"
+# Patch manifests with THIS tag before apply (so live Deployment is never stuck on :latest)
+tmp_app="$(mktemp)"
+tmp_fe="$(mktemp)"
+sed -E "s|image:[[:space:]]*[^[:space:]]*warehouse-app:[^[:space:]]*|image: ${APP_IMAGE}|" \
+  "${KD}/app.yaml" >"${tmp_app}"
+sed -E "s|image:[[:space:]]*[^[:space:]]*warehouse-frontend:[^[:space:]]*|image: ${FE_IMAGE}|" \
+  "${KD}/frontend.yaml" >"${tmp_fe}"
+kubectl apply -f "${tmp_app}"
+kubectl apply -f "${tmp_fe}"
+rm -f "${tmp_app}" "${tmp_fe}"
 kubectl -n "${NS}" patch deployment warehouse-app --type strategic -p \
   "{\"spec\":{\"template\":{\"spec\":{\"imagePullSecrets\":[{\"name\":\"harbor-cred\"}]}}}}"
 kubectl -n "${NS}" patch deployment warehouse-frontend --type strategic -p \
@@ -122,6 +129,8 @@ kubectl -n "${NS}" patch deployment warehouse-frontend --type strategic -p \
 
 kubectl set image "deployment/warehouse-app" "app=${APP_IMAGE}" -n "${NS}"
 kubectl set image "deployment/warehouse-frontend" "frontend=${FE_IMAGE}" -n "${NS}"
+kubectl -n "${NS}" annotate deployment warehouse-app warehouse-frontend \
+  "warehouse.io/image-tag=${TAG}" --overwrite
 kubectl -n "${NS}" patch deployment warehouse-app -p \
   '{"spec":{"template":{"spec":{"containers":[{"name":"app","imagePullPolicy":"Always"}]}}}}'
 kubectl -n "${NS}" patch deployment warehouse-frontend -p \
@@ -144,4 +153,4 @@ echo "== FE    http://${NODE_IP}:30080/"
 curl -fsS --connect-timeout 5 --max-time 20 \
   "http://${NODE_IP}:30081/springboot38hdw40x/config/list?page=1&limit=1" | head -c 200 || true
 echo
-echo "== Harbor ‚Ü?k8s deploy done"
+echo "== Harbor ù?k8s deploy done"

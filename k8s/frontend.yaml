@@ -30,7 +30,7 @@ spec:
         - name: harbor-cred
       containers:
         - name: frontend
-          # CD: 121.40.253.17/warehouse/warehouse-frontend:build.<N>
+          # Default :latest for manual apply. CD substitutes unique tag build.<run>-<sha7>.
           image: 121.40.253.17/warehouse/warehouse-frontend:latest
           imagePullPolicy: Always
           ports:
