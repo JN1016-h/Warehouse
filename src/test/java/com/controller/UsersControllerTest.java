@@ -269,4 +269,51 @@ public class UsersControllerTest {
         R result = controller.login("ghost", "pass", null, null, ControllerTestSupport.mockAdminRequest());
         assertEquals(500, result.get("code"));
     }
+
+    @Test
+    public void testSaveWithoutPassword() {
+        UsersEntity entity = new UsersEntity();
+        entity.setUsername("nopass");
+        entity.setPassword(null);
+        when(userService.selectOne(any())).thenReturn(null);
+
+        R result = controller.save(entity);
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testSaveWithEmptyPassword() {
+        UsersEntity entity = new UsersEntity();
+        entity.setUsername("empty");
+        entity.setPassword("");
+        when(userService.selectOne(any())).thenReturn(null);
+
+        R result = controller.save(entity);
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testUpdateSameUserNoConflict() {
+        UsersEntity user = new UsersEntity();
+        user.setId(1L);
+        user.setUsername("self");
+        UsersEntity existing = new UsersEntity();
+        existing.setId(1L);
+        existing.setUsername("self");
+        when(userService.selectOne(any())).thenReturn(existing);
+
+        R result = controller.update(user);
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testUpdateWhenNoDuplicateFound() {
+        UsersEntity user = new UsersEntity();
+        user.setId(1L);
+        user.setUsername("unique");
+        when(userService.selectOne(any())).thenReturn(null);
+
+        R result = controller.update(user);
+        assertEquals(0, result.get("code"));
+    }
 }

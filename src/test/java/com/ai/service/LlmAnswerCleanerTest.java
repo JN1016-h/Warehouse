@@ -284,4 +284,45 @@ public class LlmAnswerCleanerTest {
         String raw = "Thinking:\n\nAnalyze the Request\nDrafting the response";
         assertNull(LlmAnswerCleaner.clean(raw));
     }
+
+    @Test
+    public void embeddedThinkingKeepsOriginalWhenUsefulAndNotMostlyThinking() {
+        String raw = "有效中文前缀内容足够长可以保留\nThinking Process:\nAnalyze the Request";
+        String cleaned = LlmAnswerCleaner.clean(raw);
+        assertNotNull(cleaned);
+        assertTrue(cleaned.contains("有效中文前缀"));
+    }
+
+    @Test
+    public void embeddedThinkingReturnsNullWhenMostlyThinkingAfterBlock() {
+        String raw = "短\nThinking Process:\nAnalyze the Request\nAnalyze the Business Data\nConstraint 1\nFormulate the Response\nDrafting the response";
+        assertNull(LlmAnswerCleaner.clean(raw));
+    }
+
+    @Test
+    public void extractAfterFinalConclusionColonMarker() {
+        String raw = "Thinking Process:\n\nstep\n\n最终结论：库存周转天数处于合理区间";
+        String cleaned = LlmAnswerCleaner.clean(raw);
+        assertNotNull(cleaned);
+        assertTrue(cleaned.contains("库存周转"));
+    }
+
+    @Test
+    public void extractAfterHashHeadingMarker() {
+        String raw = "Thinking Process:\n\nstep\n\n## 中文分析标题\n\n正文内容足够长可以输出";
+        String cleaned = LlmAnswerCleaner.clean(raw);
+        assertNotNull(cleaned);
+        assertTrue(cleaned.contains("中文分析标题"));
+    }
+
+    @Test
+    public void hasUsefulAnswerReturnsFalseForNullViaClean() {
+        assertNull(LlmAnswerCleaner.clean("Analyze the Request only"));
+    }
+
+    @Test
+    public void mostlyThinkingExactlyTwoHitsWithoutChinese() {
+        String raw = "Analyze the business data and constraint 1 only english";
+        assertNull(LlmAnswerCleaner.clean(raw));
+    }
 }

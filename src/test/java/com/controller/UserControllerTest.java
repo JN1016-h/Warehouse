@@ -520,4 +520,28 @@ public class UserControllerTest {
         R result = yonghuController.update(yonghu, ControllerTestSupport.mockAdminRequest());
         assertEquals(0, result.get("code"));
     }
+
+    @Test
+    public void testLoginInputMd5MismatchNoPlaintext() {
+        YonghuEntity user = new YonghuEntity();
+        user.setId(1L);
+        user.setYonghuzhanghao("user");
+        user.setMima(EncryptUtil.md5("stored"));
+        when(yonghuService.selectOne(any())).thenReturn(user);
+
+        R result = yonghuController.login("user", "other", null, null, ControllerTestSupport.mockAdminRequest());
+        assertEquals(500, result.get("code"));
+    }
+
+    @Test
+    public void testAddWithoutPassword() {
+        YonghuEntity yonghu = new YonghuEntity();
+        yonghu.setYonghuzhanghao("nopass");
+        yonghu.setMima("  ");
+        when(yonghuService.selectCount(any())).thenReturn(0);
+        when(yonghuService.selectOne(any())).thenReturn(null);
+
+        R result = yonghuController.add(yonghu, ControllerTestSupport.mockAdminRequest());
+        assertEquals(0, result.get("code"));
+    }
 }

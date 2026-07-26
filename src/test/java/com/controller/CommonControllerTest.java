@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -171,6 +172,33 @@ public class CommonControllerTest {
     public void testCalEmptyResult() {
         when(commonService.selectCal(any())).thenReturn(new HashMap<String, Object>());
         R result = controller.cal("yonghu", "money");
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testValueDayWithDateFields() {
+        List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
+        Map<String, Object> row = new HashMap<String, Object>();
+        row.put("addtime", new Date());
+        row.put("total", 5);
+        rows.add(row);
+        when(commonService.selectTimeStatValue(any())).thenReturn(rows);
+
+        R result = controller.valueDay("yonghu", "colY", "colX", "day");
+        assertEquals(0, result.get("code"));
+        assertNotNull(result.get("data"));
+    }
+
+    @Test
+    public void testValueDayMixedFieldTypes() {
+        List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
+        Map<String, Object> row = new HashMap<String, Object>();
+        row.put("status", "ok");
+        row.put("created", new Date());
+        rows.add(row);
+        when(commonService.selectTimeStatValue(any())).thenReturn(rows);
+
+        R result = controller.valueDay("yonghu", "colY", "colX", "month");
         assertEquals(0, result.get("code"));
     }
 }

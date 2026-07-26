@@ -269,4 +269,33 @@ public class BuhuotixingControllerTest {
         R result = controller.group("status", ControllerTestSupport.mockAdminRequest());
         assertEquals(0, result.get("code"));
     }
+
+    @Test
+    public void testAddWithEmptyStatusString() {
+        BuhuotixingEntity entity = new BuhuotixingEntity();
+        entity.setTixingzhuangtai("");
+        R result = controller.add(entity, ControllerTestSupport.mockAdminRequest());
+        assertEquals(0, result.get("code"));
+        assertEquals("待处理", entity.getTixingzhuangtai());
+    }
+
+    @Test
+    public void testSaveWithNullStatus() {
+        BuhuotixingEntity entity = new BuhuotixingEntity();
+        entity.setTixingzhuangtai(null);
+        R result = controller.save(entity, ControllerTestSupport.mockAdminRequest());
+        assertEquals(0, result.get("code"));
+        assertEquals("待处理", entity.getTixingzhuangtai());
+    }
+
+    @Test
+    public void testValueDayNonDateFields() {
+        List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
+        Map<String, Object> row = new HashMap<String, Object>();
+        row.put("total", 3);
+        rows.add(row);
+        when(buhuotixingService.selectTimeStatValue(any(), any())).thenReturn(rows);
+        R result = controller.valueDay("colY", "colX", "week", ControllerTestSupport.mockAdminRequest());
+        assertEquals(0, result.get("code"));
+    }
 }

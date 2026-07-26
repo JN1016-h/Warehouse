@@ -738,4 +738,57 @@ public class FinanceServiceTest {
         FinanceSummary result = financeService.calculatePayableSummary(query);
         assertEquals(BigDecimal.ZERO, result.getTotalAmount());
     }
+
+    @Test
+    public void testUpdatePaymentStatus_InboundUnpaidClearsPaymentTime() {
+        Long orderId = 2L;
+        RukuxinxiEntity entity = new RukuxinxiEntity();
+        entity.setId(orderId);
+        entity.setPaymentStatus("PAID");
+        entity.setPaymentTime(new Date());
+
+        when(rukuxinxiDao.selectById(orderId)).thenReturn(entity);
+        when(rukuxinxiDao.updateById(any(RukuxinxiEntity.class))).thenReturn(1);
+
+        boolean result = financeService.updatePaymentStatus(orderId, "INBOUND", PaymentStatus.UNPAID);
+        assertTrue(result);
+        assertEquals("UNPAID", entity.getPaymentStatus());
+        assertNull(entity.getPaymentTime());
+    }
+
+    @Test
+    public void testCalculateReceivableSummary_WithPaidAmount() {
+        ReceivableQuery query = new ReceivableQuery();
+        ChukuxinxiEntity entity = new ChukuxinxiEntity();
+        entity.setFuzhuangbianhao("CK002");
+        entity.setKehumingcheng("客户B");
+        entity.setPaymentStatus("PAID");
+
+        DinghuoxinxiEntity order = new DinghuoxinxiEntity();
+        order.setZongjine(200.0);
+
+        when(chukuxinxiDao.selectList(any())).thenReturn(Collections.singletonList(entity));
+        when(dinghuoxinxiDao.selectList(any())).thenReturn(Collections.singletonList(order));
+
+        FinanceSummary result = financeService.calculateReceivableSummary(query);
+        assertEquals(BigDecimal.valueOf(200.0), result.getTotalAmount());
+        assertEquals(1, result.getPaidCount());
+    }
+
+    @Test
+    public void testCalculatePayableSummary_WithValidDinghuoId() {
+        PayableQuery query = new PayableQuery();
+        RukuxinxiEntity entity = new RukuxinxiEntity();
+        entity.setDinghuoid("7");
+        entity.setPaymentStatus("UNPAID");
+
+        DinghuoxinxiEntity order = new DinghuoxinxiEntity();
+        order.setZongjine(300.0);
+
+        when(rukuxinxiDao.selectList(any())).thenReturn(Collections.singletonList(entity));
+        when(dinghuoxinxiDao.selectById(7L)).thenReturn(order);
+
+        FinanceSummary result = financeService.calculatePayableSummary(query);
+        assertEquals(BigDecimal.valueOf(300.0), result.getTotalAmount());
+    }
 }

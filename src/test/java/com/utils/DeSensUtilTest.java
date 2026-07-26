@@ -112,6 +112,38 @@ public class DeSensUtilTest {
         assertEquals("invalid", entity.getEmail());
     }
 
+    @Test
+    public void testDesensitizeValidRulePaths() {
+        SensitiveEntity entity = new SensitiveEntity();
+        entity.setName("欧阳修");
+        entity.setPhone("13912345678");
+        entity.setIdCard("110101199001011234");
+        entity.setBankCard("6222021234567890123");
+        entity.setEmail("test@example.com");
+
+        Map<String, String> rules = new HashMap<>();
+        rules.put("name", "名");
+        rules.put("phone", "手");
+        rules.put("idCard", "身");
+        rules.put("bankCard", "卡");
+        rules.put("email", "邮");
+        DeSensUtil.desensitize(entity, rules);
+
+        assertEquals("欧**", entity.getName());
+        assertEquals("139****5678", entity.getPhone());
+        assertEquals("110101**********1234", entity.getIdCard());
+        assertTrue(entity.getBankCard().contains("****"));
+        assertEquals("t***@example.com", entity.getEmail());
+    }
+
+    @Test
+    public void testDesensitizeSingleCharName() {
+        SensitiveEntity entity = new SensitiveEntity();
+        entity.setName("李");
+        DeSensUtil.desensitize(entity, Collections.singletonMap("name", "名"));
+        assertEquals("李", entity.getName());
+    }
+
     public static class SensitiveEntity {
         private String name;
         private String phone;

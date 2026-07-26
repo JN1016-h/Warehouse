@@ -239,6 +239,45 @@ public class MPUtilTest {
         assertNotNull(wrapper.getSqlSegment());
     }
 
+    @Test
+    public void testSort2WithoutSortKey() {
+        Map<String, Object> params = new HashMap<>();
+        params.put("order", "desc");
+        MPUtil.sort2(new EntityWrapper<>(), params);
+    }
+
+    @Test
+    public void testSortWithNullOrderAndSort() {
+        MPUtil.sort(new EntityWrapper<>(), new HashMap<String, Object>());
+    }
+
+    @Test
+    public void testSortAscBranch() {
+        Map<String, Object> params = new HashMap<>();
+        params.put("sort", "name");
+        params.put("order", "ASC");
+        MPUtil.sort(new EntityWrapper<>(), params);
+    }
+
+    @Test
+    public void testBetweenOnlyStartKeyBlank() {
+        EntityWrapper<SampleEntity> wrapper = new EntityWrapper<>();
+        Map<String, Object> params = new HashMap<>();
+        params.put("price_start", "");
+        MPUtil.between(wrapper, params);
+        assertNotNull(wrapper);
+    }
+
+    @Test
+    public void testGenEqMultipleEntries() {
+        Map<String, Object> param = new HashMap<>();
+        param.put("status", "open");
+        param.put("name", "bob");
+        EntityWrapper<SampleEntity> wrapper = new EntityWrapper<>();
+        MPUtil.genEq(wrapper, param);
+        assertNotNull(wrapper.getSqlSegment());
+    }
+
     public static class SampleEntity {
         private String userName;
         private String status;

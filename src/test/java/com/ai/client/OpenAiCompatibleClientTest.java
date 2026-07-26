@@ -258,6 +258,38 @@ public class OpenAiCompatibleClientTest {
         assertEquals("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", invokeResolveUrl());
     }
 
+    @Test
+    public void coalesceTextJsonObjectBothFieldsNull() throws Exception {
+        com.alibaba.fastjson.JSONObject part = new com.alibaba.fastjson.JSONObject();
+        part.put("type", "text");
+        com.alibaba.fastjson.JSONArray arr = new com.alibaba.fastjson.JSONArray();
+        arr.add(part);
+        assertNull(invokeCoalesceText(arr));
+    }
+
+    @Test
+    public void coalesceTextNullContentObject() throws Exception {
+        assertNull(invokeCoalesceText(null));
+    }
+
+    @Test
+    public void extractContentUsesReasoningWhenContentNullString() throws Exception {
+        String json = "{\"choices\":[{\"message\":{\"content\":null,\"reasoning_content\":\"推理内容足够长的中文回答\"}}]}";
+        assertEquals("推理内容足够长的中文回答", invokeExtractContent(json));
+    }
+
+    @Test
+    public void extractContentNullMessageNoText() throws Exception {
+        assertNull(invokeExtractContent("{\"choices\":[{\"message\":{}}]}"));
+    }
+
+    @Test
+    public void chatUsesMaxTokensMinimum() throws Exception {
+        startMockServer("{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}", 200);
+        aiProperties.setMaxTokens(100);
+        assertEquals("ok", client.chat("system", "user"));
+    }
+
     private String invokeResolveUrl() throws Exception {
         Method m = OpenAiCompatibleClient.class.getDeclaredMethod("resolveUrl");
         m.setAccessible(true);

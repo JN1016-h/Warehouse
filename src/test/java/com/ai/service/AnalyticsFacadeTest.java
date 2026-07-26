@@ -629,6 +629,97 @@ public class AnalyticsFacadeTest {
         assertNotNull(result.get("sellThrough"));
     }
 
+    @Test
+    public void innerComparatorsHandleNullSortKeys() throws Exception {
+        Map<String, Object> a = new HashMap<String, Object>();
+        a.put("suggestQty", null);
+        Map<String, Object> b = new HashMap<String, Object>();
+        b.put("suggestQty", 10);
+
+        Class<?> repClass = Class.forName("com.ai.service.AnalyticsFacade$1");
+        java.lang.reflect.Constructor<?> repCtor = repClass.getDeclaredConstructor(AnalyticsFacade.class);
+        repCtor.setAccessible(true);
+        Object repCmp = repCtor.newInstance(analyticsFacade);
+        Method repCompare = repClass.getDeclaredMethod("compare", Map.class, Map.class);
+        repCompare.setAccessible(true);
+        assertTrue((Integer) repCompare.invoke(repCmp, a, b) > 0);
+
+        Map<String, Object> ta = new HashMap<String, Object>();
+        ta.put("turnoverRate", null);
+        Map<String, Object> tb = new HashMap<String, Object>();
+        tb.put("turnoverRate", 1.5);
+        Class<?> turnClass = Class.forName("com.ai.service.AnalyticsFacade$2");
+        java.lang.reflect.Constructor<?> turnCtor = turnClass.getDeclaredConstructor(AnalyticsFacade.class);
+        turnCtor.setAccessible(true);
+        Object turnCmp = turnCtor.newInstance(analyticsFacade);
+        Method turnCompare = turnClass.getDeclaredMethod("compare", Map.class, Map.class);
+        turnCompare.setAccessible(true);
+        assertTrue((Integer) turnCompare.invoke(turnCmp, ta, tb) < 0);
+
+        Map<String, Object> ra = new HashMap<String, Object>();
+        ra.put("ageDays", null);
+        Map<String, Object> rb = new HashMap<String, Object>();
+        rb.put("ageDays", 5);
+        Class<?> riskClass = Class.forName("com.ai.service.AnalyticsFacade$3");
+        java.lang.reflect.Constructor<?> riskCtor = riskClass.getDeclaredConstructor(AnalyticsFacade.class);
+        riskCtor.setAccessible(true);
+        Object riskCmp = riskCtor.newInstance(analyticsFacade);
+        Method riskCompare = riskClass.getDeclaredMethod("compare", Map.class, Map.class);
+        riskCompare.setAccessible(true);
+        assertTrue((Integer) riskCompare.invoke(riskCmp, ra, rb) > 0);
+    }
+
+    @Test
+    public void assembleSellThroughNormalLevelProduct() {
+        ShangpinxinxiEntity p = product("NORM", "平销款", "裤子", 10, 5, 7, 0);
+        when(shangpinxinxiDao.selectList(any())).thenReturn(Collections.singletonList(p));
+        when(chukuxinxiDao.selectList(any())).thenReturn(Collections.singletonList(outbound("NORM", 8, daysAgo(1))));
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.SELL_THROUGH, range, true);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> st = (Map<String, Object>) result.get("sellThrough");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> normal = (List<Map<String, Object>>) st.get("normalTop");
+        assertFalse(normal.isEmpty());
+    }
+
+    @Test
+    public void assembleInboundNullRukushijianSkipped() {
+        RukuxinxiEntity bad = inbound("P001", 5, null);
+        when(rukuxinxiDao.selectList(any())).thenReturn(Collections.singletonList(bad));
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.RISK, range, true);
+        assertNotNull(result.get("risk"));
+    }
+
+    @Test
+    public void assembleLatestSalePriceSkipsNullSkuInOrders() {
+        List<DinghuoxinxiEntity> orders = new ArrayList<DinghuoxinxiEntity>();
+        DinghuoxinxiEntity bad = new DinghuoxinxiEntity();
+        bad.setFuzhuangbianhao(null);
+        bad.setXiaoshoudanjia(99.0);
+        orders.add(bad);
+        when(dinghuoxinxiDao.selectList(any())).thenReturn(orders);
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.TURNOVER, range, true);
+        assertNotNull(result.get("turnover"));
+    }
+
+    @Test
+    public void assembleInventoryAggregatesExistingCategory() {
+        List<ShangpinxinxiEntity> products = new ArrayList<ShangpinxinxiEntity>();
+        products.add(product("A", "款A", "上衣", 5, 0, 7, 0));
+        products.add(product("B", "款B", "上衣", 3, 0, 7, 0));
+        when(shangpinxinxiDao.selectList(any())).thenReturn(products);
+
+        Map<String, Object> result = analyticsFacade.assemble(AiIntent.INVENTORY, range, true);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> inv = (Map<String, Object>) result.get("inventory");
+        @SuppressWarnings("unchecked")
+        Map<String, Integer> byCat = (Map<String, Integer>) inv.get("stockByCategory");
+        assertEquals(8, byCat.get("上衣").intValue());
+    }
+
     private List<ShangpinxinxiEntity> sampleProducts() {
         List<ShangpinxinxiEntity> list = new ArrayList<ShangpinxinxiEntity>();
         list.add(product("P001", "畅销款", "上衣", 10, 5, 7, 20));

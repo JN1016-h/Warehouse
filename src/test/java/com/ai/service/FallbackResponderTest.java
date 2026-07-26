@@ -341,4 +341,74 @@ public class FallbackResponderTest {
         assertTrue(result.contains("周转概况"));
         assertFalse(result.contains("说明："));
     }
+
+    @Test
+    public void respondSimpleTurnoverWithCapitalTotal() {
+        Map<String, Object> data = new LinkedHashMap<String, Object>();
+        data.put("hasData", true);
+        data.put("timeRange", "近月");
+        Map<String, Object> turnover = new LinkedHashMap<String, Object>();
+        turnover.put("turnoverRate", 1.0);
+        turnover.put("turnoverDays", 30.0);
+        turnover.put("capitalOccupationTotal", 5000.0);
+        data.put("turnover", turnover);
+
+        String result = fallbackResponder.respond("周转", AiStyle.SIMPLE, data);
+        assertTrue(result.contains("资金占用"));
+    }
+
+    @Test
+    public void respondSimpleRiskWithoutNote() {
+        Map<String, Object> data = new LinkedHashMap<String, Object>();
+        data.put("hasData", true);
+        data.put("timeRange", "近月");
+        Map<String, Object> risk = new LinkedHashMap<String, Object>();
+        risk.put("overstockTop", Collections.emptyList());
+        risk.put("stockoutTop", Collections.emptyList());
+        data.put("risk", risk);
+
+        String result = fallbackResponder.respond("风险", AiStyle.SIMPLE, data);
+        assertTrue(result.contains("库存风险"));
+    }
+
+    @Test
+    public void respondDetailedInventoryWithLowStockTable() {
+        Map<String, Object> data = new LinkedHashMap<String, Object>();
+        data.put("hasData", true);
+        data.put("timeRange", "近月");
+        Map<String, Object> inventory = new LinkedHashMap<String, Object>();
+        inventory.put("totalSku", 1);
+        inventory.put("totalStock", 2);
+        inventory.put("outboundQtyInWindow", 1);
+        inventory.put("inboundQtyInWindow", 0);
+        List<Map<String, Object>> low = new ArrayList<Map<String, Object>>();
+        Map<String, Object> row = new LinkedHashMap<String, Object>();
+        row.put("sku", "L1");
+        row.put("name", "低库存");
+        row.put("stock", 2);
+        row.put("threshold", 10);
+        low.add(row);
+        inventory.put("lowStockTop", low);
+        data.put("inventory", inventory);
+
+        String result = fallbackResponder.respond("库存", AiStyle.DETAILED, data);
+        assertTrue(result.contains("低库存"));
+        assertTrue(result.contains("L1"));
+    }
+
+    @Test
+    public void respondSellThroughWithNonListSlowTop() {
+        Map<String, Object> data = new LinkedHashMap<String, Object>();
+        data.put("hasData", true);
+        data.put("timeRange", "近月");
+        Map<String, Object> sellThrough = new LinkedHashMap<String, Object>();
+        sellThrough.put("sellThroughRate", 50);
+        sellThrough.put("skusWithOutbound", 1);
+        sellThrough.put("totalSku", 2);
+        sellThrough.put("slowTop", "not-a-list");
+        data.put("sellThrough", sellThrough);
+
+        String result = fallbackResponder.respond("动销", AiStyle.SIMPLE, data);
+        assertTrue(result.contains("暂无相关库存统计数据"));
+    }
 }

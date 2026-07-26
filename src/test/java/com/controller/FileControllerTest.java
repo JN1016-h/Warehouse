@@ -73,7 +73,7 @@ public class FileControllerTest {
     }
 
     @Test
-    public void testDownloadExistingFile() throws Exception {
+    public void testDownloadExistingFileWrongUploadPath() throws Exception {
         File uploadDir = tempDir.resolve("upload").toFile();
         uploadDir.mkdirs();
         File target = new File(uploadDir, "sample.txt");
@@ -105,5 +105,13 @@ public class FileControllerTest {
     public void testDownloadMissingFile() {
         ResponseEntity<byte[]> response = controller.download("nonexistent-file-xyz.txt");
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+    }
+
+    @Test
+    public void testUploadWhenStaticPathMissing() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "plain.txt", "text/plain",
+                "data".getBytes(StandardCharsets.UTF_8));
+        R result = controller.upload(file, null);
+        assertEquals(0, result.get("code"));
     }
 }

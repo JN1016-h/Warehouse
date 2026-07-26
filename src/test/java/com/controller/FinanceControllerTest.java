@@ -584,4 +584,60 @@ public class FinanceControllerTest {
         financeController.exportReceivablesToPDF(new HashMap<String, Object>(), response);
         assertEquals(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, response.getStatus());
     }
+
+    @Test
+    public void testQueryReceivablesWithNullParamValues() {
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("startDate", null);
+        params.put("endDate", null);
+        params.put("customerName", null);
+        params.put("page", null);
+        params.put("limit", null);
+        params.put("paymentStatus", null);
+        when(financeService.queryReceivables(any(ReceivableQuery.class)))
+                .thenReturn(new PageUtils(Collections.emptyList(), 0, 10, 1));
+
+        R result = financeController.queryReceivables(params);
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testQueryPayablesWithNullParamValues() {
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("startDate", null);
+        params.put("endDate", null);
+        params.put("supplierName", null);
+        params.put("page", null);
+        params.put("limit", null);
+        params.put("paymentStatus", null);
+        when(financeService.queryPayables(any(PayableQuery.class)))
+                .thenReturn(new PageUtils(Collections.emptyList(), 0, 10, 1));
+
+        R result = financeController.queryPayables(params);
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testGetReceivableSummaryWithNullDates() {
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("startDate", null);
+        params.put("endDate", null);
+        when(financeService.calculateReceivableSummary(any(ReceivableQuery.class)))
+                .thenReturn(new FinanceSummary());
+
+        R result = financeController.getReceivableSummary(params);
+        assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testGetPayableSummaryWithNullDates() {
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("startDate", null);
+        params.put("endDate", null);
+        when(financeService.calculatePayableSummary(any(PayableQuery.class)))
+                .thenReturn(new FinanceSummary());
+
+        R result = financeController.getPayableSummary(params);
+        assertEquals(0, result.get("code"));
+    }
 }
