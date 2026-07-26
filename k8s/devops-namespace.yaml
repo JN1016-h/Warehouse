@@ -1,0 +1,7 @@
+# DevSecOps tools namespace (SonarQube + CI HTML reports)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: warehouse-devops
+  labels:
+    app.kubernetes.io/part-of: warehouse-cicd

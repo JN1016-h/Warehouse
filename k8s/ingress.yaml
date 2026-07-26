@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: warehouse-ingress
+  namespace: warehouse
+  annotations:
+    # 保留 /springboot38hdw40x 前缀（与 Spring context-path 一致），禁止 rewrite 剥路径
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+spec:
+  rules:
+    - http:
+        paths:
+          # 更长前缀优先：API 走后端
+          - path: /springboot38hdw40x
+            pathType: Prefix
+            backend:
+              service:
+                name: warehouse-app
+                port:
+                  number: 8080
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: warehouse-frontend
+                port:
+                  number: 80

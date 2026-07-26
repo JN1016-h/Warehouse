@@ -1,0 +1,125 @@
+# Server DevSecOps + Java middleware (常驻)
+#
+# A. 本机常驻：MySQL / App / SonarQube / CI 报表 Nginx
+# B. SAST·扫描·Perf 工具在 GitHub Actions（cicd.yml）临时跑，不必常驻
+#    Gitleaks Semgrep Maven Newman Trivy Checkov ZAP k6 JMeter
+#
+# Harbor 已占用 :80，前端勿绑 80。App API :8080，Sonar :9000，报表 :9080
+#
+# 启动：./bootstrap.sh
+
+services:
+  mysql:
+    image: ${MYSQL_IMAGE:-mysql:8.0}
+    container_name: warehouse-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123123}"
+      MYSQL_DATABASE: springboot38hdw40x
+      TZ: Asia/Shanghai
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - warehouse_mysql_data:/var/lib/mysql
+      - ../../db/springboot38hdw40x.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ../../db/migration_ai_assistant.sql:/docker-entrypoint-initdb.d/02_ai.sql:ro
+      - ../../db/migration_user_role_and_demo_fix.sql:/docker-entrypoint-initdb.d/03_user_role_demo.sql:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-123123}"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 20s
+
+  app:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      args:
+        REGISTRY_MIRROR: ${REGISTRY_MIRROR:-m.daocloud.io/docker.io/library}
+    image: warehouse-app:server
+    container_name: warehouse-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "${APP_HTTP_PORT:-8080}:8080"
+    environment:
+      TZ: Asia/Shanghai
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/springboot38hdw40x?useUnicode=true&characterEncoding=utf-8&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true"
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123123}"
+      AI_ENABLED: "${AI_ENABLED:-true}"
+      AI_PROVIDER: openai-compatible
+      AI_BASE_URL: ${AI_BASE_URL:-https://ai.imge.cc.cd/v1}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-qwen/qwen3.5-35b-a3b}
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-90000}
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 50s
+
+  sonar-db:
+    image: ${POSTGRES_IMAGE:-postgres:15}
+    container_name: warehouse-sonar-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: "${SONAR_DB_PASSWORD:-sonarpass}"
+      POSTGRES_DB: sonar
+    volumes:
+      - sonar_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sonar -d sonar"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  sonarqube:
+    image: ${SONAR_IMAGE:-sonarqube:lts-community}
+    container_name: warehouse-sonarqube
+    restart: unless-stopped
+    depends_on:
+      sonar-db:
+        condition: service_healthy
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://sonar-db:5432/sonar
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: "${SONAR_DB_PASSWORD:-sonarpass}"
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+    ports:
+      - "${SONAR_HTTP_PORT:-9000}:9000"
+    volumes:
+      - sonar_data:/opt/sonarqube/data
+      - sonar_ext:/opt/sonarqube/extensions
+      - sonar_logs:/opt/sonarqube/logs
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+  reports-nginx:
+    image: ${NGINX_IMAGE:-nginx:1.25-alpine}
+    container_name: warehouse-ci-reports
+    restart: unless-stopped
+    ports:
+      - "${REPORTS_HTTP_PORT:-9080}:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${CI_REPORTS_HOST_DIR:-/opt/ci-reports}:/usr/share/nginx/html/reports
+
+volumes:
+  warehouse_mysql_data:
+  sonar_pg_data:
+  sonar_data:
+  sonar_ext:
+  sonar_logs:

@@ -1,0 +1,123 @@
+# Java backend (Spring Boot) — Kubernetes
+# Service NodePort 30081 → http://<NODE_IP>:30081/springboot38hdw40x/
+#
+# Apply:
+#   kubectl apply -f k8s/namespace.yaml
+#   kubectl apply -f k8s/mysql.yaml          # DB first
+#   kubectl apply -f k8s/app.yaml
+#   kubectl set image deployment/warehouse-app app=warehouse-app:build.<N> -n warehouse
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: warehouse-app-config
+  namespace: warehouse
+data:
+  # Spring Boot 2.x env binding → spring.datasource.*
+  SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/springboot38hdw40x?useUnicode=true&characterEncoding=utf-8&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true"
+  SPRING_DATASOURCE_USERNAME: "root"
+  SPRING_DATASOURCE_DRIVER_CLASS_NAME: "com.mysql.cj.jdbc.Driver"
+  SERVER_PORT: "8080"
+  SERVER_SERVLET_CONTEXT_PATH: "/springboot38hdw40x"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: warehouse-app-secret
+  namespace: warehouse
+type: Opaque
+stringData:
+  SPRING_DATASOURCE_PASSWORD: "123123"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: warehouse-app
+  namespace: warehouse
+  labels:
+    app: warehouse-app
+    tier: backend
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: warehouse-app
+  template:
+    metadata:
+      labels:
+        app: warehouse-app
+        tier: backend
+    spec:
+      terminationGracePeriodSeconds: 30
+      imagePullSecrets:
+        - name: harbor-cred
+      containers:
+        - name: app
+          # CD: 121.40.253.17/warehouse/warehouse-app:build.<run_number>
+          image: 121.40.253.17/warehouse/warehouse-app:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: warehouse-app-config
+            - secretRef:
+                name: warehouse-app-secret
+          env:
+            - name: JAVA_OPTS
+              value: "-Xms256m -Xmx512m -XX:+UseContainerSupport"
+            - name: TZ
+              value: Asia/Shanghai
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "384Mi"
+            limits:
+              cpu: "1000m"
+              memory: "768Mi"
+          readinessProbe:
+            httpGet:
+              path: /springboot38hdw40x/config/list?page=1&limit=1
+              port: http
+            initialDelaySeconds: 25
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /springboot38hdw40x/config/list?page=1&limit=1
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /springboot38hdw40x/config/list?page=1&limit=1
+              port: http
+            failureThreshold: 30
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: warehouse-app
+  namespace: warehouse
+  labels:
+    app: warehouse-app
+spec:
+  selector:
+    app: warehouse-app
+  type: NodePort
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      nodePort: 30081

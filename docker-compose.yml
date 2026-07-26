@@ -1,0 +1,77 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: warehouse-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "123123"
+      MYSQL_DATABASE: springboot38hdw40x
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - warehouse-mysql-data:/var/lib/mysql
+      - ./db/springboot38hdw40x.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./db/migration_ai_assistant.sql:/docker-entrypoint-initdb.d/02_ai.sql:ro
+      - ./db/migration_user_role_and_demo_fix.sql:/docker-entrypoint-initdb.d/03_user_role_demo.sql:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p123123"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 20s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        REGISTRY_MIRROR: ${REGISTRY_MIRROR:-docker.io/library}
+    image: warehouse-app:local
+    container_name: warehouse-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: Asia/Shanghai
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/springboot38hdw40x?useUnicode=true&characterEncoding=utf-8&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true"
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: "123123"
+      AI_ENABLED: "true"
+      AI_PROVIDER: openai-compatible
+      AI_BASE_URL: ${AI_BASE_URL:-https://ai.imge.cc.cd/v1}
+      AI_API_KEY: ${AI_API_KEY:-sk-0305a2be4edc60f5dedc92194de47d1d92eb83289488bba75351fd44391b6425}
+      AI_MODEL: ${AI_MODEL:-qwen/qwen3.5-35b-a3b}
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-90000}
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: deploy/docker/frontend.Dockerfile
+      args:
+        REGISTRY_MIRROR: ${REGISTRY_MIRROR:-docker.io/library}
+    image: warehouse-frontend:local
+    container_name: warehouse-frontend
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+
+volumes:
+  warehouse-mysql-data:

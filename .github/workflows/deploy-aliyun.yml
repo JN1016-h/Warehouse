@@ -1,0 +1,417 @@
+# CD: sync → build → push Harbor → k8s pulls from Harbor
+# gate → sync → build → push-harbor → deploy-infrastructure → deploy-services → deploy-gateway → verify
+name: Deploy Aliyun
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: [Cicd]
+    types: [completed]
+    branches: [master, main]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: deploy-aliyun-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       (github.event.workflow_run.head_branch == 'master' ||
+        github.event.workflow_run.head_branch == 'main'))
+    steps:
+      - name: Ready for CD
+        run: echo "CD gate passed event=${{ github.event_name }} sha=${{ github.sha }}"
+
+  sync:
+    name: sync
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Write SSH private key
+        run: |
+          f="$GITHUB_WORKSPACE/.ssh_deploy_key"
+          umask 077
+          echo "$SSH_PRIVATE_KEY" > "$f"
+          bytes=$(wc -c < "$f" | tr -d ' ')
+          if [ "${bytes:-0}" -lt 80 ]; then
+            echo "::error::Set secret ALIYUN_SSH_KEY"
+            exit 1
+          fi
+          if ! grep -qE 'BEGIN (OPENSSH|RSA|EC) PRIVATE KEY' "$f"; then
+            echo "::error::ALIYUN_SSH_KEY must be a PRIVATE key PEM."
+            exit 1
+          fi
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
+
+      - name: Pack source
+        run: |
+          tar --exclude='./.git' --exclude='**/node_modules' --exclude='./target' \
+              --exclude='./.ssh_deploy_key' -czf /tmp/warehouse-src.tgz .
+          ls -lh /tmp/warehouse-src.tgz
+
+      - name: Upload tarball
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ALIYUN_HOST }}
+          username: ${{ secrets.ALIYUN_USER }}
+          key_path: ${{ github.workspace }}/.ssh_deploy_key
+          passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
+          port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
+          source: "/tmp/warehouse-src.tgz"
+          target: "/tmp/"
+          overwrite: true
+
+      - name: Extract on host
+        uses: appleboy/ssh-action@v1.2.1
+        env:
+          DEPLOY_PATH: ${{ vars.ALIYUN_DEPLOY_PATH }}
+        with:
+          host: ${{ secrets.ALIYUN_HOST }}
+          username: ${{ secrets.ALIYUN_USER }}
+          key_path: ${{ github.workspace }}/.ssh_deploy_key
+          passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
+          port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
+          command_timeout: 10m
+          envs: DEPLOY_PATH
+          script: |
+            set -euo pipefail
+            DP="${DEPLOY_PATH:-/opt/deploy/warehouse-management-project}"
+            mkdir -p "$DP"
+            tar -xzf /tmp/warehouse-src.tgz -C "$DP"
+            sed -i 's/\r$//' "$DP"/k8s/*.sh || true
+            chmod +x "$DP"/k8s/*.sh
+            test -f "$DP/Dockerfile" && test -f "$DP/k8s/apply-stack.sh"
+            echo "== sync ok → ${DP}"
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f "$GITHUB_WORKSPACE/.ssh_deploy_key"
+
+  build:
+    name: build
+    needs: sync
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write SSH private key
+        run: |
+          umask 077
+          echo "$SSH_PRIVATE_KEY" > "$GITHUB_WORKSPACE/.ssh_deploy_key"
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
+
+      - name: Build images tagged for Harbor
+        uses: appleboy/ssh-action@v1.2.1
+        env:
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          GITHUB_SHA: ${{ github.sha }}
+          DEPLOY_PATH: ${{ vars.ALIYUN_DEPLOY_PATH }}
+          HARBOR_HOST: ${{ vars.HARBOR_HOST }}
+          HARBOR_PROJECT: ${{ vars.HARBOR_PROJECT }}
+        with:
+          host: ${{ secrets.ALIYUN_HOST }}
+          username: ${{ secrets.ALIYUN_USER }}
+          key_path: ${{ github.workspace }}/.ssh_deploy_key
+          passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
+          port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
+          command_timeout: 60m
+          envs: GITHUB_RUN_NUMBER,GITHUB_SHA,DEPLOY_PATH,HARBOR_HOST,HARBOR_PROJECT
+          script: |
+            set -euo pipefail
+            DP="${DEPLOY_PATH:-/opt/deploy/warehouse-management-project}"
+            HH="${HARBOR_HOST:-121.40.253.17}"
+            HP="${HARBOR_PROJECT:-warehouse}"
+            TAG="build.${GITHUB_RUN_NUMBER}"
+            IMAGE="${HH}/${HP}/warehouse-app:${TAG}"
+            FE_IMAGE="${HH}/${HP}/warehouse-frontend:${TAG}"
+            cd "$DP"
+            docker build -t "${IMAGE}" -f ./Dockerfile .
+            docker build -t "${FE_IMAGE}" -f deploy/frontend-ci.Dockerfile .
+            echo "${IMAGE}" > /tmp/warehouse-app.image
+            echo "${FE_IMAGE}" > /tmp/warehouse-frontend.image
+            echo "== BUILD ok ${IMAGE} ${FE_IMAGE}"
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f "$GITHUB_WORKSPACE/.ssh_deploy_key"
+
+  push-harbor:
+    name: push-harbor
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write SSH private key
+        run: |
+          umask 077
+          echo "$SSH_PRIVATE_KEY" > "$GITHUB_WORKSPACE/.ssh_deploy_key"
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
+
+      - name: Push to Harbor
+        uses: appleboy/ssh-action@v1.2.1
+        env:
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          HARBOR_HOST: ${{ vars.HARBOR_HOST }}
+          HARBOR_PROJECT: ${{ vars.HARBOR_PROJECT }}
+          HARBOR_USER: ${{ secrets.HARBOR_USER }}
+          HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+        with:
+          host: ${{ secrets.ALIYUN_HOST }}
+          username: ${{ secrets.ALIYUN_USER }}
+          key_path: ${{ github.workspace }}/.ssh_deploy_key
+          passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
+          port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
+          command_timeout: 30m
+          envs: GITHUB_RUN_NUMBER,HARBOR_HOST,HARBOR_PROJECT,HARBOR_USER,HARBOR_PASSWORD
+          script: |
+            set -euo pipefail
+            HH="${HARBOR_HOST:-121.40.253.17}"
+            HP="${HARBOR_PROJECT:-warehouse}"
+            HU="${HARBOR_USER:-admin}"
+            HPW="${HARBOR_PASSWORD:-Harbor12345}"
+            TAG="build.${GITHUB_RUN_NUMBER}"
+            IMAGE="${HH}/${HP}/warehouse-app:${TAG}"
+            FE_IMAGE="${HH}/${HP}/warehouse-frontend:${TAG}"
+            curl -fsS -u "${HU}:${HPW}" -H 'Content-Type: application/json' \
+              -X POST "http://${HH}/api/v2.0/projects" \
+              -d "{\"project_name\":\"${HP}\",\"public\":true,\"metadata\":{\"public\":\"true\"}}" \
+              >/dev/null 2>&1 || true
+            echo "${HPW}" | docker login "${HH}" -u "${HU}" --password-stdin
+            docker push "${IMAGE}"
+            docker push "${FE_IMAGE}"
+            echo "== pushed ${IMAGE} ${FE_IMAGE}"
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f "$GITHUB_WORKSPACE/.ssh_deploy_key"
+
+  deploy-infrastructure:
+    name: deploy-infrastructure
+    needs: push-harbor
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write SSH private key
+        run: |
+          umask 077
+          echo "$SSH_PRIVATE_KEY" > "$GITHUB_WORKSPACE/.ssh_deploy_key"
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
+
+      - name: MySQL + Harbor registry for k3s
+        uses: appleboy/ssh-action@v1.2.1
+        env:
+          DEPLOY_PATH: ${{ vars.ALIYUN_DEPLOY_PATH }}
+          K8S_DIR: ${{ vars.K8S_DIR }}
+          NAMESPACE: ${{ vars.K8S_NAMESPACE }}
+          HARBOR_HOST: ${{ vars.HARBOR_HOST }}
+          HARBOR_USER: ${{ secrets.HARBOR_USER }}
+          HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+        with:
+          host: ${{ secrets.ALIYUN_HOST }}
+          username: ${{ secrets.ALIYUN_USER }}
+          key_path: ${{ github.workspace }}/.ssh_deploy_key
+          passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
+          port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
+          command_timeout: 25m
+          envs: DEPLOY_PATH,K8S_DIR,NAMESPACE,HARBOR_HOST,HARBOR_USER,HARBOR_PASSWORD
+          script: |
+            set -euo pipefail
+            DP="${DEPLOY_PATH:-/opt/deploy/warehouse-management-project}"
+            KD="${K8S_DIR:-${DP}/k8s}"
+            NS="${NAMESPACE:-warehouse}"
+            HH="${HARBOR_HOST:-121.40.253.17}"
+            HU="${HARBOR_USER:-admin}"
+            HPW="${HARBOR_PASSWORD:-Harbor12345}"
+            kubectl apply -f "${KD}/namespace.yaml"
+            mkdir -p /etc/rancher/k3s
+            cat > /etc/rancher/k3s/registries.yaml <<EOF
+            mirrors:
+              docker.io:
+                endpoint:
+                  - "https://docker.m.daocloud.io"
+                  - "https://docker.1ms.run"
+              "${HH}":
+                endpoint:
+                  - "http://${HH}"
+            configs:
+              "${HH}":
+                auth:
+                  username: ${HU}
+                  password: ${HPW}
+                tls:
+                  insecure_skip_verify: true
+            EOF
+            # fix leading spaces from heredoc indentation
+            sed -i 's/^            //' /etc/rancher/k3s/registries.yaml
+            systemctl restart k3s
+            sleep 12
+            kubectl -n "${NS}" create secret docker-registry harbor-cred \
+              --docker-server="${HH}" \
+              --docker-username="${HU}" \
+              --docker-password="${HPW}" \
+              --dry-run=client -o yaml | kubectl apply -f -
+            kubectl -n "${NS}" create configmap mysql-initdb \
+              --from-file=01_schema.sql="${DP}/db/springboot38hdw40x.sql" \
+              --from-file=02_ai.sql="${DP}/db/migration_ai_assistant.sql" \
+              --from-file=03_user_role_demo.sql="${DP}/db/migration_user_role_and_demo_fix.sql" \
+              --dry-run=client -o yaml | kubectl apply -f -
+            kubectl apply -f "${KD}/mysql.yaml"
+            kubectl rollout status "deployment/mysql" -n "${NS}" --timeout=600s || true
+            echo "== infrastructure ok"
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f "$GITHUB_WORKSPACE/.ssh_deploy_key"
+
+  deploy-services:
+    name: deploy-services
+    needs: deploy-infrastructure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write SSH private key
+        run: |
+          umask 077
+          echo "$SSH_PRIVATE_KEY" > "$GITHUB_WORKSPACE/.ssh_deploy_key"
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
+
+      - name: Deploy — k8s pull from Harbor
+        uses: appleboy/ssh-action@v1.2.1
+        env:
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          DEPLOY_PATH: ${{ vars.ALIYUN_DEPLOY_PATH }}
+          K8S_DIR: ${{ vars.K8S_DIR }}
+          NAMESPACE: ${{ vars.K8S_NAMESPACE }}
+          HARBOR_HOST: ${{ vars.HARBOR_HOST }}
+          HARBOR_PROJECT: ${{ vars.HARBOR_PROJECT }}
+        with:
+          host: ${{ secrets.ALIYUN_HOST }}
+          username: ${{ secrets.ALIYUN_USER }}
+          key_path: ${{ github.workspace }}/.ssh_deploy_key
+          passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
+          port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
+          command_timeout: 30m
+          envs: GITHUB_RUN_NUMBER,DEPLOY_PATH,K8S_DIR,NAMESPACE,HARBOR_HOST,HARBOR_PROJECT
+          script: |
+            set -euo pipefail
+            DP="${DEPLOY_PATH:-/opt/deploy/warehouse-management-project}"
+            KD="${K8S_DIR:-${DP}/k8s}"
+            NS="${NAMESPACE:-warehouse}"
+            HH="${HARBOR_HOST:-121.40.253.17}"
+            HP="${HARBOR_PROJECT:-warehouse}"
+            TAG="build.${GITHUB_RUN_NUMBER}"
+            IMAGE="${HH}/${HP}/warehouse-app:${TAG}"
+            FE_IMAGE="${HH}/${HP}/warehouse-frontend:${TAG}"
+            kubectl apply -f "${KD}/app.yaml"
+            kubectl apply -f "${KD}/frontend.yaml"
+            kubectl set image "deployment/warehouse-app" "app=${IMAGE}" -n "${NS}"
+            kubectl set image "deployment/warehouse-frontend" "frontend=${FE_IMAGE}" -n "${NS}"
+            kubectl rollout status "deployment/warehouse-app" -n "${NS}" --timeout=600s
+            kubectl rollout status "deployment/warehouse-frontend" -n "${NS}" --timeout=600s
+            NODE_IP="$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || echo 127.0.0.1)"
+            curl -fsS "http://${NODE_IP}:30081/springboot38hdw40x/config/list?page=1&limit=1" >/dev/null && echo API_OK
+            curl -fsS -o /dev/null "http://${NODE_IP}:30080/" && echo FE_OK
+            kubectl get pods -n "${NS}" -o wide
+            kubectl get deploy -n "${NS}" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.template.spec.containers[0].image}{"\n"}{end}'
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f "$GITHUB_WORKSPACE/.ssh_deploy_key"
+
+  deploy-gateway:
+    name: deploy-gateway
+    needs: deploy-services
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write SSH private key
+        run: |
+          umask 077
+          echo "$SSH_PRIVATE_KEY" > "$GITHUB_WORKSPACE/.ssh_deploy_key"
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
+
+      - name: Ingress optional
+        uses: appleboy/ssh-action@v1.2.1
+        env:
+          DEPLOY_PATH: ${{ vars.ALIYUN_DEPLOY_PATH }}
+          K8S_DIR: ${{ vars.K8S_DIR }}
+          NAMESPACE: ${{ vars.K8S_NAMESPACE }}
+        with:
+          host: ${{ secrets.ALIYUN_HOST }}
+          username: ${{ secrets.ALIYUN_USER }}
+          key_path: ${{ github.workspace }}/.ssh_deploy_key
+          passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
+          port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
+          command_timeout: 10m
+          envs: DEPLOY_PATH,K8S_DIR,NAMESPACE
+          script: |
+            set -euo pipefail
+            DP="${DEPLOY_PATH:-/opt/deploy/warehouse-management-project}"
+            KD="${K8S_DIR:-${DP}/k8s}"
+            NS="${NAMESPACE:-warehouse}"
+            [ -f "${KD}/ingress.yaml" ] && kubectl apply -f "${KD}/ingress.yaml" || true
+            echo "== FE:30080 API:30081 Harbor:80"
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f "$GITHUB_WORKSPACE/.ssh_deploy_key"
+
+  verify:
+    name: verify
+    needs: deploy-gateway
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write SSH private key
+        run: |
+          umask 077
+          echo "$SSH_PRIVATE_KEY" > "$GITHUB_WORKSPACE/.ssh_deploy_key"
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
+
+      - name: Verify
+        uses: appleboy/ssh-action@v1.2.1
+        env:
+          NAMESPACE: ${{ vars.K8S_NAMESPACE }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+        with:
+          host: ${{ secrets.ALIYUN_HOST }}
+          username: ${{ secrets.ALIYUN_USER }}
+          key_path: ${{ github.workspace }}/.ssh_deploy_key
+          passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
+          port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
+          command_timeout: 10m
+          envs: NAMESPACE,GITHUB_RUN_NUMBER
+          script: |
+            set -euo pipefail
+            NS="${NAMESPACE:-warehouse}"
+            kubectl get pods,svc,deploy -n "${NS}" -o wide
+            NODE_IP="$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || echo 127.0.0.1)"
+            curl -fsS "http://${NODE_IP}:30081/springboot38hdw40x/config/list?page=1&limit=1" && echo
+            curl -fsS -o /dev/null "http://${NODE_IP}:30080/" && echo FE_OK
+            echo "build=${GITHUB_RUN_NUMBER}"
+
+      - name: Summary
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## CD: code → Harbor → k3s
+          - Images: \`121.40.253.17/warehouse/*:build.${{ github.run_number }}\`
+          - Frontend: http://121.40.253.17:30080/
+          - API: http://121.40.253.17:30081/springboot38hdw40x/
+          EOF
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f "$GITHUB_WORKSPACE/.ssh_deploy_key"

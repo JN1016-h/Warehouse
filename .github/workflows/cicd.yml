@@ -1,0 +1,628 @@
+# Warehouse CI — aligned with CICD reference DevSecOps stages
+# Jobs: sast → unit → integration → container_iac_scan → dast → performance
+name: Cicd
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  IMAGE: warehouse-app:ci-${{ github.sha }}
+  FE_IMAGE: warehouse-frontend:ci-${{ github.sha }}
+  CI_LOCAL_HEALTH_URL: http://127.0.0.1:8080/springboot38hdw40x/config/list?page=1&limit=1
+  CI_LOCAL_APP_BASE: http://127.0.0.1:8080/springboot38hdw40x
+  CI_MYSQL_IMAGE: mysql:8.0
+  ARTIFACT_RETENTION_DAYS: 7
+
+jobs:
+  # ---------- SAST (Gitleaks + Semgrep; Java/Vue stack, no Bandit/pip-audit) ----------
+  sast:
+    name: sast
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Gitleaks
+        run: |
+          set -euo pipefail
+          VER=8.21.2
+          curl -fsSL -o /tmp/gitleaks.tgz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${VER}/gitleaks_${VER}_linux_x64.tar.gz"
+          sudo tar -xzf /tmp/gitleaks.tgz -C /usr/local/bin gitleaks
+          gitleaks version
+
+      - name: Gitleaks (secrets)
+        run: |
+          mkdir -p reports/sast
+          # Soft-fail for legacy repo secrets; triage via artifact then tighten to exit-code 1
+          gitleaks detect --source . --report-path reports/sast/gitleaks.json --report-format json --exit-code 0
+          gitleaks detect --source . --report-path reports/sast/gitleaks.sarif --report-format sarif --exit-code 0 || true
+
+      - name: Install Semgrep
+        run: |
+          python3 -m pip install --user semgrep
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Semgrep (Java)
+        run: |
+          mkdir -p reports/sast
+          semgrep --config p/java --timeout 300 --json -o reports/sast/semgrep-java.json . || true
+          semgrep --config p/java --timeout 300 .
+
+      - name: Semgrep (JavaScript / Vue)
+        run: |
+          semgrep --config p/javascript --timeout 300 --json -o reports/sast/semgrep-js.json . || true
+          semgrep --config p/javascript --timeout 300 .
+
+      - name: Build SAST HTML dashboard
+        if: always()
+        run: python3 deploy/ci/generate-html-reports.py sast reports/sast reports/sast
+
+      - name: Upload SAST reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sast-reports
+          path: reports/sast
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: warn
+
+  # ---------- Unit (Maven + JaCoCo coverage HTML) ----------
+  unit:
+    name: unit
+    needs: sast
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "8"
+          cache: maven
+
+      - name: Maven unit tests + JaCoCo
+        run: mvn -B -ntp test jacoco:report -DskipTests=false -Dmaven.test.skip=false
+
+      - name: Build unit HTML dashboard
+        if: always()
+        run: |
+          mkdir -p reports/unit
+          python3 deploy/ci/generate-html-reports.py unit reports/unit target/surefire-reports
+          if [ -d target/site/jacoco ]; then
+            cp -r target/site/jacoco reports/unit/jacoco
+          fi
+
+      - name: Upload unit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-reports
+          path: |
+            reports/unit
+            target/surefire-reports
+            target/site/jacoco
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: warn
+
+  # ---------- SonarQube (calls server-hosted Sonar) ----------
+  # Enable with repo Variable SONAR_ENABLED=true and Secrets SONAR_HOST_URL + SONAR_TOKEN
+  sonar:
+    name: sonar
+    needs: unit
+    runs-on: ubuntu-latest
+    if: ${{ vars.SONAR_ENABLED == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Download unit coverage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: unit-reports
+          path: unit-art
+
+      - name: Compile + restore JaCoCo for Sonar
+        run: |
+          set -euo pipefail
+          mvn -B -ntp -DskipTests compile
+          mkdir -p target/site
+          if [ -d unit-art/target/site/jacoco ]; then
+            cp -r unit-art/target/site/jacoco target/site/jacoco
+          elif [ -d unit-art/jacoco ]; then
+            cp -r unit-art/jacoco target/site/jacoco
+          elif [ -d unit-art/unit/jacoco ]; then
+            cp -r unit-art/unit/jacoco target/site/jacoco
+          elif [ -d unit-art/reports/unit/jacoco ]; then
+            cp -r unit-art/reports/unit/jacoco target/site/jacoco
+          fi
+          find unit-art -name 'jacoco.xml' | head -5 || true
+          test -f target/site/jacoco/jacoco.xml && echo "jacoco xml ok" || echo "WARN: jacoco.xml missing"
+
+      - name: Cache Sonar scanner
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: sonar-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
+
+      - name: SonarQube scan (remote server)
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SONAR_HOST_URL:-}" ] || [ -z "${SONAR_TOKEN:-}" ]; then
+            echo "::error::Set secrets SONAR_HOST_URL and SONAR_TOKEN (and Variable SONAR_ENABLED=true)"
+            exit 1
+          fi
+          mvn -B -ntp -DskipTests org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar \
+            -Dsonar.host.url="${SONAR_HOST_URL}" \
+            -Dsonar.token="${SONAR_TOKEN}" \
+            -Dsonar.projectKey=warehouse-management \
+            -Dsonar.projectName="Warehouse Management" \
+            -Dsonar.java.binaries=target/classes \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+
+      - name: Write Sonar link to summary
+        if: always()
+        run: |
+          echo "## SonarQube" >> "$GITHUB_STEP_SUMMARY"
+          echo "Dashboard: \`${{ secrets.SONAR_HOST_URL }}/dashboard?id=warehouse-management\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------- Integration (Compose stack + Newman) ----------
+  integration:
+    name: integration
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker build app
+        run: docker build -f ./Dockerfile -t "${{ env.IMAGE }}" .
+
+      - name: Start MySQL + app
+        run: |
+          set -euo pipefail
+          docker network create ci-app-net
+          docker run -d --name mysql-ci --network ci-app-net \
+            -e MYSQL_ROOT_PASSWORD=123123 \
+            -e MYSQL_DATABASE=springboot38hdw40x \
+            -v "$GITHUB_WORKSPACE/db/springboot38hdw40x.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro" \
+            "${{ env.CI_MYSQL_IMAGE }}"
+          for i in $(seq 1 90); do
+            docker exec mysql-ci mysqladmin ping -h127.0.0.1 -uroot -p123123 --silent 2>/dev/null && break
+            sleep 2
+          done
+          docker run -d --name warehouse-app-ci --network ci-app-net \
+            -p 127.0.0.1:8080:8080 \
+            -e JAVA_OPTS="-Xms256m -Xmx512m" \
+            -e SPRING_DATASOURCE_URL='jdbc:mysql://mysql-ci:3306/springboot38hdw40x?useUnicode=true&characterEncoding=utf-8&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true' \
+            -e SPRING_DATASOURCE_USERNAME=root \
+            -e SPRING_DATASOURCE_PASSWORD=123123 \
+            "${{ env.IMAGE }}"
+          for i in $(seq 1 60); do
+            curl -fsS "${{ env.CI_LOCAL_HEALTH_URL }}" && exit 0
+            sleep 2
+          done
+          docker logs warehouse-app-ci --tail 80 || true
+          exit 1
+
+      - name: Install Newman
+        run: npm install -g newman newman-reporter-htmlextra
+
+      - name: Newman API smoke
+        run: |
+          mkdir -p reports/integration
+          cat > /tmp/ci.postman_environment.json <<EOF
+          {
+            "id": "ci-env",
+            "name": "ci",
+            "values": [
+              { "key": "baseUrl", "value": "${{ env.CI_LOCAL_APP_BASE }}", "enabled": true }
+            ]
+          }
+          EOF
+          newman run tests/postman/warehouse.postman_collection.json \
+            -e /tmp/ci.postman_environment.json \
+            --reporters cli,htmlextra \
+            --reporter-htmlextra-export reports/integration/newman.html \
+            || true
+
+      - name: Upload integration reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-reports
+          path: reports/integration
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: warn
+
+      - name: Teardown
+        if: always()
+        run: |
+          docker rm -f warehouse-app-ci mysql-ci 2>/dev/null || true
+          docker network rm ci-app-net 2>/dev/null || true
+
+  # ---------- Container + IaC (Trivy + Checkov) ----------
+  container_iac_scan:
+    name: container_iac_scan
+    needs: integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker build (app + frontend)
+        run: |
+          docker build -f ./Dockerfile -t "${{ env.IMAGE }}" .
+          docker build -f deploy/frontend-ci.Dockerfile -t "${{ env.FE_IMAGE }}" .
+
+      - name: Install Trivy
+        run: |
+          set -euo pipefail
+          TRIVY_VERSION=0.70.0
+          curl -fsSL -o /tmp/trivy.tar.gz \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          sudo tar -xzf /tmp/trivy.tar.gz -C /usr/local/bin trivy
+          trivy --version
+
+      - name: Trivy filesystem + IaC hints
+        run: |
+          mkdir -p reports/trivy
+          trivy fs --scanners vuln,config --exit-code 0 --timeout 10m \
+            --format json -o reports/trivy/fs.json .
+
+      - name: Trivy image (app)
+        run: |
+          trivy image --exit-code 0 --timeout 15m \
+            --format json -o reports/trivy/app-image.json "${{ env.IMAGE }}"
+
+      - name: Trivy image (frontend)
+        run: |
+          trivy image --exit-code 0 --timeout 15m \
+            --format json -o reports/trivy/frontend-image.json "${{ env.FE_IMAGE }}"
+
+      - name: Install Checkov
+        run: |
+          python3 -m pip install --user checkov
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Checkov (k8s + Dockerfiles)
+        run: |
+          mkdir -p reports/checkov
+          checkov -d k8s --framework kubernetes --compact -o json > reports/checkov/k8s.json || true
+          checkov -f Dockerfile --framework dockerfile --compact -o json > reports/checkov/dockerfile-app.json || true
+          checkov -f deploy/frontend-ci.Dockerfile --framework dockerfile --compact -o json > reports/checkov/dockerfile-frontend.json || true
+          checkov -d k8s --framework kubernetes --compact || true
+
+      - name: Build Trivy/Checkov HTML dashboards
+        if: always()
+        run: |
+          mkdir -p reports/html
+          python3 deploy/ci/generate-html-reports.py trivy reports/html reports/trivy/fs.json "Trivy Filesystem Scan"
+          python3 deploy/ci/generate-html-reports.py trivy reports/html reports/trivy/app-image.json "Trivy App Image Scan"
+          python3 deploy/ci/generate-html-reports.py trivy reports/html reports/trivy/frontend-image.json "Trivy Frontend Image Scan"
+          python3 deploy/ci/generate-html-reports.py checkov reports/html reports/checkov/k8s.json "Checkov Kubernetes"
+          python3 deploy/ci/generate-html-reports.py checkov reports/html reports/checkov/dockerfile-app.json "Checkov Dockerfile (app)"
+          python3 deploy/ci/generate-html-reports.py checkov reports/html reports/checkov/dockerfile-frontend.json "Checkov Dockerfile (frontend)"
+          cp -r reports/html/* reports/trivy/ 2>/dev/null || true
+          cp reports/html/*.html reports/checkov/ 2>/dev/null || true
+
+      - name: Upload container/IaC reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-iac-reports
+          path: |
+            reports/trivy
+            reports/checkov
+            reports/html
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: warn
+
+  # ---------- DAST (OWASP ZAP) ----------
+  dast:
+    name: dast
+    needs: container_iac_scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker build
+        run: docker build -f ./Dockerfile -t "${{ env.IMAGE }}" .
+
+      - name: Start MySQL + app
+        run: |
+          set -euo pipefail
+          docker network create ci-app-net
+          docker run -d --name mysql-ci --network ci-app-net \
+            -e MYSQL_ROOT_PASSWORD=123123 \
+            -e MYSQL_DATABASE=springboot38hdw40x \
+            -v "$GITHUB_WORKSPACE/db/springboot38hdw40x.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro" \
+            "${{ env.CI_MYSQL_IMAGE }}"
+          for i in $(seq 1 90); do
+            docker exec mysql-ci mysqladmin ping -h127.0.0.1 -uroot -p123123 --silent 2>/dev/null && break
+            sleep 2
+          done
+          docker run -d --name warehouse-app-ci --network ci-app-net \
+            -p 127.0.0.1:8080:8080 \
+            -e JAVA_OPTS="-Xms256m -Xmx512m" \
+            -e SPRING_DATASOURCE_URL='jdbc:mysql://mysql-ci:3306/springboot38hdw40x?useUnicode=true&characterEncoding=utf-8&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true' \
+            -e SPRING_DATASOURCE_USERNAME=root \
+            -e SPRING_DATASOURCE_PASSWORD=123123 \
+            "${{ env.IMAGE }}"
+          for i in $(seq 1 60); do
+            curl -fsS "${{ env.CI_LOCAL_HEALTH_URL }}" && exit 0
+            sleep 2
+          done
+          exit 1
+
+      - name: OWASP ZAP baseline
+        run: |
+          mkdir -p reports/dast
+          docker run --rm --network host \
+            -v "$GITHUB_WORKSPACE/reports/dast:/zap/wrk:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t "${{ env.CI_LOCAL_HEALTH_URL }}" \
+            -r zap-report.html \
+            -J zap-report.json || true
+          ls -lah reports/dast || true
+
+      - name: Upload DAST reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dast-zap-reports
+          path: reports/dast
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: warn
+
+      - name: Teardown
+        if: always()
+        run: |
+          docker rm -f warehouse-app-ci mysql-ci 2>/dev/null || true
+          docker network rm ci-app-net 2>/dev/null || true
+
+  # ---------- Performance (k6 + JMeter) ----------
+  performance:
+    name: performance
+    needs: dast
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start MySQL + app
+        run: |
+          set -euo pipefail
+          docker build -f ./Dockerfile -t "${{ env.IMAGE }}" .
+          docker network create ci-app-net
+          docker run -d --name mysql-ci --network ci-app-net \
+            -e MYSQL_ROOT_PASSWORD=123123 \
+            -e MYSQL_DATABASE=springboot38hdw40x \
+            -v "$GITHUB_WORKSPACE/db/springboot38hdw40x.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro" \
+            "${{ env.CI_MYSQL_IMAGE }}"
+          for i in $(seq 1 90); do
+            docker exec mysql-ci mysqladmin ping -h127.0.0.1 -uroot -p123123 --silent 2>/dev/null && break
+            sleep 2
+          done
+          docker run -d --name warehouse-app-ci --network ci-app-net \
+            -p 127.0.0.1:8080:8080 \
+            -e JAVA_OPTS="-Xms256m -Xmx512m" \
+            -e SPRING_DATASOURCE_URL='jdbc:mysql://mysql-ci:3306/springboot38hdw40x?useUnicode=true&characterEncoding=utf-8&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true' \
+            -e SPRING_DATASOURCE_USERNAME=root \
+            -e SPRING_DATASOURCE_PASSWORD=123123 \
+            "${{ env.IMAGE }}"
+          for i in $(seq 1 60); do
+            curl -fsS "${{ env.CI_LOCAL_HEALTH_URL }}" && exit 0
+            sleep 2
+          done
+          exit 1
+
+      - name: Install k6
+        run: |
+          curl -fsSL -o /tmp/k6.tgz https://github.com/grafana/k6/releases/download/v0.49.0/k6-v0.49.0-linux-amd64.tar.gz
+          sudo tar -C /tmp -xzf /tmp/k6.tgz
+          sudo install -m 0755 /tmp/k6-v0.49.0-linux-amd64/k6 /usr/local/bin/k6
+
+      - name: k6 load test
+        run: |
+          mkdir -p reports/perf/k6
+          k6 run --out json=reports/perf/k6/raw.json \
+            -e BASE_URL="${{ env.CI_LOCAL_APP_BASE }}" \
+            tests/k6/smoke.js
+
+      - name: Install JMeter
+        run: |
+          JMETER_VER=5.6.3
+          curl -fsSL -o /tmp/jmeter.tgz "https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-${JMETER_VER}.tgz"
+          sudo tar -C /opt -xzf /tmp/jmeter.tgz
+          echo "/opt/apache-jmeter-${JMETER_VER}/bin" >> "$GITHUB_PATH"
+
+      - name: Run JMeter
+        run: |
+          mkdir -p reports/perf/jmeter tests/jmeter/output reports/perf/jmeter-dashboard
+          cp tests/jmeter/warehouse-load.jmx /tmp/warehouse-load.ci.jmx
+          # Point plan at local CI app (rewrite common host/port placeholders)
+          sed -i 's#<stringProp name="HTTPSampler.domain">[^<]*</stringProp>#<stringProp name="HTTPSampler.domain">127.0.0.1</stringProp>#g' /tmp/warehouse-load.ci.jmx
+          sed -i 's#<stringProp name="HTTPSampler.port">[^<]*</stringProp>#<stringProp name="HTTPSampler.port">8080</stringProp>#g' /tmp/warehouse-load.ci.jmx
+          jmeter -n -t /tmp/warehouse-load.ci.jmx \
+            -l reports/perf/jmeter/result.jtl \
+            -j reports/perf/jmeter/jmeter.log \
+            -e -o reports/perf/jmeter-dashboard || true
+
+      - name: Build k6 / JMeter HTML summaries
+        if: always()
+        run: |
+          python3 deploy/ci/generate-html-reports.py k6 reports/perf/k6 reports/perf/k6/raw.json
+          python3 deploy/ci/generate-html-reports.py jmeter reports/perf/jmeter reports/perf/jmeter/result.jtl
+
+      - name: Upload performance reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-reports
+          path: reports/perf
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: warn
+
+      - name: Teardown
+        if: always()
+        run: |
+          docker rm -f warehouse-app-ci mysql-ci 2>/dev/null || true
+          docker network rm ci-app-net 2>/dev/null || true
+
+  # ---------- Unified HTML dashboard (like reference doc screenshots) ----------
+  html_dashboard:
+    name: html_dashboard
+    needs: [sast, unit, integration, container_iac_scan, dast, performance]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all report artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: collected
+          pattern: "*-reports"
+          merge-multiple: false
+
+      - name: Assemble dashboard
+        run: |
+          set -euo pipefail
+          mkdir -p dashboard
+          # Flatten known HTML files into dashboard/
+          find collected -type f \( -name '*.html' -o -name '*.htm' \) | while read -r f; do
+            base="$(basename "$f")"
+            # avoid overwrite collisions
+            rel="$(echo "$f" | sed 's#^collected/##' | tr '/' '_')"
+            cp "$f" "dashboard/${rel}"
+          done
+          # Prefer short names for key pages
+          cp collected/sast-reports/sast-summary.html dashboard/sast-summary.html 2>/dev/null || true
+          cp collected/unit-reports/unit-summary.html dashboard/unit-summary.html 2>/dev/null || true
+          # JaCoCo HTML coverage (like reference coverage screenshots)
+          if [ -d collected/unit-reports/target/site/jacoco ]; then
+            cp -r collected/unit-reports/target/site/jacoco dashboard/jacoco
+          elif [ -d collected/unit-reports/jacoco ]; then
+            cp -r collected/unit-reports/jacoco dashboard/jacoco
+          elif [ -d collected/unit-reports/unit/jacoco ]; then
+            cp -r collected/unit-reports/unit/jacoco dashboard/jacoco
+          fi
+          cp collected/integration-reports/newman.html dashboard/newman.html 2>/dev/null || true
+          cp collected/dast-zap-reports/zap-report.html dashboard/zap-report.html 2>/dev/null || true
+          cp collected/performance-reports/k6/k6-summary.html dashboard/k6-summary.html 2>/dev/null || true
+          cp collected/performance-reports/jmeter/jmeter-summary.html dashboard/jmeter-summary.html 2>/dev/null || true
+          # JMeter official dashboard
+          if [ -d collected/performance-reports/jmeter-dashboard ]; then
+            cp -r collected/performance-reports/jmeter-dashboard dashboard/jmeter-dashboard
+          fi
+          # Trivy / Checkov html from container artifact
+          for f in collected/container-iac-reports/html/*.html collected/container-iac-reports/trivy/*.html collected/container-iac-reports/checkov/*.html; do
+            [ -f "$f" ] || continue
+            cp "$f" "dashboard/$(basename "$f")"
+          done
+
+          python3 deploy/ci/generate-html-reports.py index dashboard \
+            "SAST|SAST Security Scan Summary|sast-summary.html|Gitleaks + Semgrep 统计与明细" \
+            "Unit|Unit Test Summary|unit-summary.html|Maven Surefire" \
+            "Coverage|JaCoCo Coverage Report|jacoco/index.html|语句/分支覆盖率（类似文档 coverage 截图）" \
+            "Integration|Newman API Report|newman.html|Postman/Newman HTML" \
+            "Container|Trivy App Image|app-image.html|镜像漏洞分级统计" \
+            "Container|Trivy Frontend Image|frontend-image.html|前端镜像扫描" \
+            "Container|Trivy Filesystem|fs.html|依赖/配置扫描" \
+            "IaC|Checkov Kubernetes|k8s.html|K8s 配置检查" \
+            "IaC|Checkov Dockerfile (app)|dockerfile-app.html|Dockerfile 最佳实践" \
+            "DAST|OWASP ZAP Report|zap-report.html|动态扫描 HTML" \
+            "Performance|K6 Summary|k6-summary.html|延迟 p50/p95" \
+            "Performance|JMeter Summary|jmeter-summary.html|JTL 汇总" \
+            "Performance|JMeter Dashboard|jmeter-dashboard/index.html|官方图表看板（若生成）" \
+            "Sonar|SonarQube Dashboard|${{ secrets.SONAR_HOST_URL }}/dashboard?id=warehouse-management|服务器 Sonar（需配置）"
+
+          echo "## CI HTML Dashboard" >> "$GITHUB_STEP_SUMMARY"
+          echo "Download artifact **ci-html-dashboard** and open \`index.html\` in a browser." >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ vars.SONAR_ENABLED }}" = "true" ]; then
+            echo "SonarQube: ${{ secrets.SONAR_HOST_URL }}/dashboard?id=warehouse-management" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          ls -lah dashboard | head -50
+
+      - name: Upload HTML dashboard
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-html-dashboard
+          path: dashboard
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: warn
+
+  # ---------- Publish HTML reports to server nginx (/reports) ----------
+  publish_reports:
+    name: publish_reports
+    needs: html_dashboard
+    if: ${{ always() && vars.REPORTS_SYNC_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write SSH key
+        run: |
+          umask 077
+          echo "$SSH_PRIVATE_KEY" > "$GITHUB_WORKSPACE/.ssh_deploy_key"
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
+
+      - name: Download dashboard
+        uses: actions/download-artifact@v4
+        with:
+          name: ci-html-dashboard
+          path: dashboard
+
+      - name: Sync reports to server nginx volume
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ALIYUN_HOST }}
+          username: ${{ secrets.ALIYUN_USER }}
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
+          passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
+          port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
+          source: "dashboard/*"
+          target: "${{ vars.REPORTS_REMOTE_DIR || '/opt/ci-reports' }}/${{ github.run_number }}/"
+          strip_components: 1
+
+      - name: Point latest symlink + summary
+        uses: appleboy/ssh-action@v1.2.1
+        env:
+          RUN_ID: ${{ github.run_number }}
+          REPORTS_REMOTE_DIR: ${{ vars.REPORTS_REMOTE_DIR || '/opt/ci-reports' }}
+          REPORTS_HTTP_PORT: ${{ vars.REPORTS_HTTP_PORT || '9080' }}
+        with:
+          host: ${{ secrets.ALIYUN_HOST }}
+          username: ${{ secrets.ALIYUN_USER }}
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
+          passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
+          port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
+          envs: RUN_ID,REPORTS_REMOTE_DIR,REPORTS_HTTP_PORT
+          script: |
+            set -euo pipefail
+            RD="${REPORTS_REMOTE_DIR:-/opt/ci-reports}"
+            mkdir -p "${RD}"
+            ln -sfn "${RD}/${RUN_ID}" "${RD}/latest"
+            echo "Reports URL path: /reports/latest/"
+            ls -lah "${RD}/latest" | head -20
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f "$GITHUB_WORKSPACE/.ssh_deploy_key"
