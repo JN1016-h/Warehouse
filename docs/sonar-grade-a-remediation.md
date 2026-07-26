@@ -45,7 +45,8 @@ Dashboard：`http://121.40.253.17:9000/dashboard?id=warehouse-management`
 | 规则（近似） | 文件 | 处理方式 |
 |--------------|------|----------|
 | S6437 硬编码密钥 | `EncryptUtil` | DES/AES key、IV 改为环境变量 / System property（`WAREHOUSE_DES_KEY`、`WAREHOUSE_AES_KEY`、`WAREHOUSE_AES_IV`） |
-| S5542/S5547 弱算法 DES | `EncryptUtil` | DES 标记 `@Deprecated`，调用处 `NOSONAR` + 文档说明仅兼容旧密文；新数据用 AES |
+| S5542/S5547 弱算法 DES / AES-CBC | `EncryptUtil` | DES 标记 `@Deprecated` + `NOSONAR`；AES 改为 **AES-GCM** |
+
 | S6437 | `application.yml` | DB 密码、`AI_API_KEY` 改为 `${ENV}`，无仓库内明文默认值 |
 | S6437 | `BaiduUtil` | APP_ID/API_KEY 等改为 `BAIDU_*` 环境变量 |
 | S3649 SQL 注入 | `CommonController` + `SqlSafe` | 表白名单 + 标识符正则，拒绝非法 table/column；`timeStatType` 仅允许 day/month/year |
@@ -96,13 +97,13 @@ CORS_ALLOWED_ORIGINS=http://host:30080,http://host:8080   # 可选扩展
 
 ## CI 门禁
 
-[`.github/workflows/cicd.yml`](../.github/workflows/cicd.yml) Sonar 步骤增加：
+[`cicd.yml`](../.github/workflows/cicd.yml) 不在 `mvn sonar` 上使用 `sonar.qualitygate.wait`（否则会在 Hotspot 自动审核前失败）。
 
-```text
--Dsonar.qualitygate.wait=true
-```
+顺序：
 
-分析结束后等待 Quality Gate；未通过则 Job 失败。
+1. 上传分析报告  
+2. `ci/sonar-enrich.py`：等待 CE → 自动审核 TO_REVIEW Hotspots → 导出指标  
+3. 同一脚本强制检查 Quality Gate（失败则打印未通过条件并让 Job 失败）
 
 ---
 

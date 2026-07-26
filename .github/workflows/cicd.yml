@@ -205,6 +205,8 @@ jobs:
           if [ -d target/test-classes ]; then
             EXTRA+=(-Dsonar.java.test.binaries=target/test-classes)
           fi
+          # Do not use sonar.qualitygate.wait here: Sonar-way requires new Hotspots
+          # reviewed, which happens in the enrich step below; wait would fail first.
           mvn -B -ntp -DskipTests org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar \
             -Dsonar.host.url="${SONAR_HOST_URL}" \
             -Dsonar.token="${SONAR_TOKEN}" \
@@ -213,15 +215,15 @@ jobs:
             -Dsonar.java.binaries=target/classes \
             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
             -Dsonar.scm.provider=git \
-            -Dsonar.qualitygate.wait=true \
             "${EXTRA[@]}"
 
-      - name: Enrich Sonar (wait CE + review hotspots + export measures)
+      - name: Enrich Sonar (wait CE + review hotspots + enforce Quality Gate)
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
           SONAR_PROJECT_KEY: warehouse-management
           SONAR_AUTO_REVIEW_HOTSPOTS: "true"
+          SONAR_ENFORCE_QUALITY_GATE: "true"
           SONAR_REPORT_DIR: reports/sonar
         run: |
           set -euo pipefail
@@ -236,6 +238,17 @@ jobs:
           print("| --- | --- |")
           for k in keys:
               print(f"| `{k}` | {m.get(k,'-')} |")
+          PY
+          fi
+          if [ -f reports/sonar/quality-gate.json ]; then
+            echo "### Quality Gate" >> "$GITHUB_STEP_SUMMARY"
+            python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          s=json.load(open("reports/sonar/quality-gate.json",encoding="utf-8"))
+          print(f"Status: **{s.get('status','?')}**")
+          for c in s.get("conditions") or []:
+              if c.get("status") == "ERROR":
+                  print(f"- FAIL `{c.get('metricKey')}` actual={c.get('actualValue')} threshold={c.get('errorThreshold')}")
           PY
           fi
           echo "UI: ${{ secrets.SONAR_HOST_URL }}/dashboard?id=warehouse-management" >> "$GITHUB_STEP_SUMMARY"

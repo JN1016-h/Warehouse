@@ -154,6 +154,33 @@ def review_hotspot(key: str) -> str:
     raise RuntimeError(f"Failed to review hotspot {key}")
 
 
+def fetch_quality_gate() -> dict:
+    qs = urllib.parse.urlencode({"projectKey": PROJECT_KEY})
+    _, payload = api("GET", f"/api/qualitygates/project_status?{qs}")
+    return payload.get("projectStatus") or {}
+
+
+def assert_quality_gate() -> None:
+    """Fail CI after hotspot review so Sonar-way 'hotspots reviewed' can pass."""
+    status = fetch_quality_gate()
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    (OUT_DIR / "quality-gate.json").write_text(json.dumps(status, indent=2), encoding="utf-8")
+    print("Quality Gate:", json.dumps(status, indent=2))
+    gate = status.get("status") or "UNKNOWN"
+    if gate == "OK":
+        print("Quality Gate OK")
+        return
+    print("Failed Quality Gate conditions:")
+    for c in status.get("conditions") or []:
+        if c.get("status") == "ERROR":
+            print(
+                f"  - {c.get('metricKey')}: actual={c.get('actualValue')} "
+                f"op={c.get('comparator')} threshold={c.get('errorThreshold')} "
+                f"(period={c.get('periodIndex')})"
+            )
+    die(f"QUALITY GATE STATUS: {gate} - see {HOST}/dashboard?id={PROJECT_KEY}")
+
+
 def fetch_measures() -> dict:
     metric_keys = ",".join(
         [
@@ -263,6 +290,11 @@ def main() -> None:
     print(f"Hotspots Reviewed = {reviewed_pct}% (project {PROJECT_KEY})")
     if reviewed_pct in (None, "", "0.0", "0"):
         print("WARN: Hotspots Reviewed still 0 — check token permissions (Browse + Administer Issues)")
+    # After auto-review, enforce gate here (not during mvn sonar) so hotspot % is updated.
+    if os.environ.get("SONAR_ENFORCE_QUALITY_GATE", "true").lower() in ("1", "true", "yes"):
+        # brief lag for metric refresh after hotspot reviews
+        time.sleep(3)
+        assert_quality_gate()
 
 
 if __name__ == "__main__":

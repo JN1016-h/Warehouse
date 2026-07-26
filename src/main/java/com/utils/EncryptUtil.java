@@ -16,7 +16,7 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.DESKeySpec;
-import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 import cn.hutool.crypto.digest.DigestUtil;
@@ -24,14 +24,16 @@ import cn.hutool.crypto.digest.DigestUtil;
 /**
  * Crypto helpers. Symmetric keys are loaded from env/system properties
  * (WAREHOUSE_DES_KEY, WAREHOUSE_AES_KEY, WAREHOUSE_AES_IV) — never hard-coded.
- * DES remains only for legacy ciphertext; prefer AES for new data.
+ * AES uses GCM. DES remains only for legacy ciphertext.
  * MD5 is retained for existing password hashes (legacy schema).
  */
 public class EncryptUtil {
 
     private static final String DES_ALGORITHM = "DES";
     private static final String AES_ALGORITHM = "AES";
-    private static final String AES_TRANSFORMATION = "AES/CBC/PKCS5Padding";
+    private static final String AES_TRANSFORMATION = "AES/GCM/NoPadding";
+    private static final int GCM_TAG_BITS = 128;
+    private static final int GCM_IV_BYTES = 12;
 
     private static String config(String envKey, String propKey) {
         String v = System.getenv(envKey);
@@ -61,12 +63,12 @@ public class EncryptUtil {
         return key.substring(0, 16);
     }
 
-    private static String requireAesIv() {
+    private static byte[] requireAesIvBytes() {
         String iv = config("WAREHOUSE_AES_IV", "warehouse.aes.iv");
-        if (iv == null || iv.length() < 16) {
-            throw new IllegalStateException("WAREHOUSE_AES_IV / warehouse.aes.iv must be set (min 16 chars)");
+        if (iv == null || iv.length() < GCM_IV_BYTES) {
+            throw new IllegalStateException("WAREHOUSE_AES_IV / warehouse.aes.iv must be set (min 12 chars)");
         }
-        return iv.substring(0, 16);
+        return iv.substring(0, GCM_IV_BYTES).getBytes(StandardCharsets.UTF_8);
     }
 
     /**
@@ -148,14 +150,12 @@ public class EncryptUtil {
         }
         try {
             SecretKeySpec secretKeySpec = new SecretKeySpec(requireAesKey().getBytes(StandardCharsets.UTF_8), AES_ALGORITHM);
-            IvParameterSpec ivParameterSpec = new IvParameterSpec(requireAesIv().getBytes(StandardCharsets.UTF_8));
+            GCMParameterSpec gcm = new GCMParameterSpec(GCM_TAG_BITS, requireAesIvBytes());
             Cipher cipher = Cipher.getInstance(AES_TRANSFORMATION);
-            cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, ivParameterSpec);
+            cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, gcm);
             byte[] encryptedData = cipher.doFinal(text.getBytes(StandardCharsets.UTF_8));
             return Base64.getEncoder().encodeToString(encryptedData);
-        } catch (InvalidKeyException | NoSuchAlgorithmException | NoSuchPaddingException
-                | InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException
-                | IllegalStateException e) {
+        } catch (Exception e) {
             return null;
         }
     }
@@ -166,15 +166,13 @@ public class EncryptUtil {
         }
         try {
             SecretKeySpec secretKeySpec = new SecretKeySpec(requireAesKey().getBytes(StandardCharsets.UTF_8), AES_ALGORITHM);
-            IvParameterSpec ivParameterSpec = new IvParameterSpec(requireAesIv().getBytes(StandardCharsets.UTF_8));
+            GCMParameterSpec gcm = new GCMParameterSpec(GCM_TAG_BITS, requireAesIvBytes());
             Cipher cipher = Cipher.getInstance(AES_TRANSFORMATION);
-            cipher.init(Cipher.DECRYPT_MODE, secretKeySpec, ivParameterSpec);
+            cipher.init(Cipher.DECRYPT_MODE, secretKeySpec, gcm);
             byte[] decodedData = Base64.getDecoder().decode(text);
             byte[] decryptedData = cipher.doFinal(decodedData);
             return new String(decryptedData, StandardCharsets.UTF_8);
-        } catch (InvalidKeyException | NoSuchAlgorithmException | NoSuchPaddingException
-                | InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException
-                | IllegalStateException | IllegalArgumentException e) {
+        } catch (Exception e) {
             return null;
         }
     }
