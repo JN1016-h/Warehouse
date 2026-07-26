@@ -613,24 +613,24 @@ jobs:
           [ -f dashboard/e2e-summary.html ] || cp dashboard/e2e-reports_e2e-summary.html dashboard/e2e-summary.html 2>/dev/null || true
 
           python3 ci/generate-html-reports.py index dashboard \
-            "Evidence|????????????|evidence-index.html|Unit/Integration/E2E/Perf/Security ???????? \
-            "Unit|Unit Test Summary|unit-summary.html|Maven Surefire ?????????" \
-            "Unit|JaCoCo Coverage Report|jacoco/index.html|???/???????? \
-            "Integration|Newman API Report|newman.html|??????????? \
-            "E2E|User Journey E2E|e2e-summary.html|????????? PASS/FAIL" \
+            "Evidence|五类测试证据总览|evidence-index.html|Unit/Integration/E2E/Perf/Security 可核查入口" \
+            "Unit|Unit Test Summary|unit-summary.html|Maven Surefire 完整用例结果" \
+            "Unit|JaCoCo Coverage Report|jacoco/index.html|语句/分支覆盖率" \
+            "Integration|Newman API Report|newman.html|跨模块接口集成" \
+            "E2E|User Journey E2E|e2e-summary.html|真实用户流程 PASS/FAIL" \
             "SAST|SAST Security Scan Summary|sast-summary.html|Gitleaks + Semgrep" \
-            "Container|Trivy App Image|app-image.html|?????????" \
-            "Container|Trivy Frontend Image|frontend-image.html|?????????" \
-            "Container|Trivy Filesystem|fs.html|???/??????" \
-            "IaC|Checkov Kubernetes|k8s.html|K8s ??????? \
-            "DAST|OWASP ZAP Report|zap-report.html|???????HTML" \
-            "Security|Security Evidence Pack|security-evidence.html|?????????????? \
-            "Performance|K6 Summary|k6-summary.html|??? p50/p95/??????" \
-            "Performance|JMeter Summary|jmeter-summary.html|JTL ???? \
-            "Performance|JMeter Dashboard|jmeter-dashboard/index.html|???/?????????" \
-            "Performance|Bottleneck Analysis|perf-analysis.html|??????????? \
+            "Container|Trivy App Image|app-image.html|镜像漏洞分级" \
+            "Container|Trivy Frontend Image|frontend-image.html|前端镜像扫描" \
+            "Container|Trivy Filesystem|fs.html|依赖/配置扫描" \
+            "IaC|Checkov Kubernetes|k8s.html|K8s 配置检查" \
+            "DAST|OWASP ZAP Report|zap-report.html|动态扫描 HTML" \
+            "Security|Security Evidence Pack|security-evidence.html|漏洞清单与复测核查" \
+            "Performance|K6 Summary|k6-summary.html|延迟 p50/p95/压力阶梯" \
+            "Performance|JMeter Summary|jmeter-summary.html|JTL 汇总" \
+            "Performance|JMeter Dashboard|jmeter-dashboard/index.html|吞吐/响应时间曲线" \
+            "Performance|Bottleneck Analysis|perf-analysis.html|瓶颈与优化方案" \
             "Sonar|SonarQube Measures|sonar-summary.html|Bugs/Vulns/Hotspots/Coverage" \
-            "Sonar|SonarQube Dashboard|${{ secrets.SONAR_HOST_URL }}/dashboard?id=warehouse-management|?????Sonar"
+            "Sonar|SonarQube Dashboard|${{ secrets.SONAR_HOST_URL }}/dashboard?id=warehouse-management|服务器 Sonar"
 
           python3 ci/generate-evidence-pack.py dashboard
 
