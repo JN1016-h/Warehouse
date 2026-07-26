@@ -636,7 +636,13 @@ jobs:
               mv "${RD}/${RUN_ID}/dashboard"/* "${RD}/${RUN_ID}/" 2>/dev/null || true
               rmdir "${RD}/${RUN_ID}/dashboard" 2>/dev/null || true
             fi
-            ln -sfn "${RD}/${RUN_ID}" "${RD}/latest"
+            # If latest is already a directory, ln -sfn creates latest/<run> instead of replacing it
+            rm -rf "${RD}/latest"
+            # Relative symlink so it resolves inside the nginx container bind-mount
+            # (absolute /opt/ci-reports/... does not exist in-container)
+            ln -sfn "${RUN_ID}" "${RD}/latest"
+            test -L "${RD}/latest"
+            test -f "${RD}/latest/index.html"
             cat > "${RD}/index.html" <<EOF
             <html><body>
             <h1>CI Reports</h1>
@@ -656,7 +662,8 @@ jobs:
             # strip leading spaces from heredoc indent
             sed -i 's/^            //' "${RD}/index.html"
             echo "URL: http://<host>:${REPORTS_HTTP_PORT}/reports/latest/index.html"
-            find "${RD}/latest" -maxdepth 2 -type f -name '*.html' | head -n 30 || true
+            find "${RD}/latest" -maxdepth 2 -type f -name '*.html' > /tmp/ci-reports-html-list.txt || true
+            head -n 30 /tmp/ci-reports-html-list.txt || true
 
       - name: Remove SSH key
         if: always()
