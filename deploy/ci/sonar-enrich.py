@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+import base64
 import json
 import os
 import sys
@@ -29,11 +30,21 @@ def die(msg: str, code: int = 1) -> None:
     raise SystemExit(code)
 
 
+def _auth_headers() -> dict[str, str]:
+    # Self-hosted SonarQube expects token as Basic username + empty password.
+    # Bearer works on SonarCloud / newer SQ only and often returns 401 here.
+    basic = base64.b64encode(f"{TOKEN}:".encode("utf-8")).decode("ascii")
+    return {
+        "Authorization": f"Basic {basic}",
+        "User-Agent": "warehouse-sonar-enrich",
+    }
+
+
 def api(method: str, path: str, data: dict | None = None, form: bool = False):
     if not HOST or not TOKEN:
         die("SONAR_HOST_URL and SONAR_TOKEN are required")
     url = f"{HOST}{path}"
-    headers = {"Authorization": f"Bearer {TOKEN}", "User-Agent": "warehouse-sonar-enrich"}
+    headers = _auth_headers()
     body = None
     if data is not None:
         if form:
