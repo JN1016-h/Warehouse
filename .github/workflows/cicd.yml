@@ -107,10 +107,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: unit-reports
-          path: |
-            reports/unit
-            target/surefire-reports
-            target/site/jacoco
+          # Only reports/unit (includes unit-summary.html + jacoco/) for stable dashboard paths
+          path: reports/unit
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
           if-no-files-found: warn
 
@@ -147,12 +145,23 @@ jobs:
             cp -r unit-art/target/site/jacoco target/site/jacoco
           elif [ -d unit-art/jacoco ]; then
             cp -r unit-art/jacoco target/site/jacoco
+          elif [ -d unit-art/reports/unit/jacoco ]; then
+            cp -r unit-art/reports/unit/jacoco target/site/jacoco
           elif [ -d unit-art/unit/jacoco ]; then
             cp -r unit-art/unit/jacoco target/site/jacoco
           elif [ -d unit-art/reports/unit/jacoco ]; then
             cp -r unit-art/reports/unit/jacoco target/site/jacoco
           fi
-          find unit-art -name 'jacoco.xml' | head -5 || true
+          # also accept jacoco.xml anywhere under unit-art
+          if [ ! -f target/site/jacoco/jacoco.xml ]; then
+            xml="$(find unit-art -name jacoco.xml 2>/dev/null | head -n1 || true)"
+            if [ -n "${xml:-}" ]; then
+              mkdir -p target/site/jacoco
+              cp "$xml" target/site/jacoco/jacoco.xml
+            fi
+          fi
+          find unit-art -name 'jacoco.xml' > "$RUNNER_TEMP/jacoco-xmls.txt" || true
+          head -n 5 "$RUNNER_TEMP/jacoco-xmls.txt" || true
           test -f target/site/jacoco/jacoco.xml && echo "jacoco xml ok" || echo "WARN: jacoco.xml missing"
 
       - name: Cache Sonar scanner
@@ -410,15 +419,24 @@ jobs:
 
       - name: OWASP ZAP baseline
         run: |
+          set -euo pipefail
           mkdir -p reports/dast
+          # ZAP container user must be able to write HTML/JSON into the mount
+          chmod 777 reports/dast
           docker run --rm --network host \
             -v "$GITHUB_WORKSPACE/reports/dast:/zap/wrk:rw" \
             ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py \
             -t "${{ env.CI_LOCAL_HEALTH_URL }}" \
             -r zap-report.html \
-            -J zap-report.json || true
+            -J zap-report.json \
+            -I || true
           ls -lah reports/dast || true
+          # Fail soft but surface missing HTML clearly
+          if [ ! -f reports/dast/zap-report.html ]; then
+            echo "<html><body><h1>ZAP report missing</h1><p>Baseline did not write zap-report.html. Check job logs.</p></body></html>" \
+              > reports/dast/zap-report.html
+          fi
 
       - name: Upload DAST reports
         if: always()
@@ -557,19 +575,34 @@ jobs:
             rel="$(echo "$f" | sed 's#^collected/##' | tr '/' '_')"
             cp "$f" "dashboard/${rel}"
           done
-          # Prefer short names for key pages
+          # Prefer short names for key pages (artifact layouts vary by upload path)
           cp collected/sast-reports/sast-summary.html dashboard/sast-summary.html 2>/dev/null || true
+          cp collected/sast-reports/reports/sast/sast-summary.html dashboard/sast-summary.html 2>/dev/null || true
+          # unit artifact is uploaded as reports/unit + target/... → collected/unit-reports/reports/unit/...
           cp collected/unit-reports/unit-summary.html dashboard/unit-summary.html 2>/dev/null || true
-          # JaCoCo HTML coverage (like reference coverage screenshots)
+          cp collected/unit-reports/reports/unit/unit-summary.html dashboard/unit-summary.html 2>/dev/null || true
+          find collected/unit-reports -type f -name 'unit-summary.html' -exec cp {} dashboard/unit-summary.html \; 2>/dev/null || true
+          # JaCoCo HTML coverage
           if [ -d collected/unit-reports/target/site/jacoco ]; then
             cp -r collected/unit-reports/target/site/jacoco dashboard/jacoco
+          elif [ -d collected/unit-reports/reports/unit/jacoco ]; then
+            cp -r collected/unit-reports/reports/unit/jacoco dashboard/jacoco
           elif [ -d collected/unit-reports/jacoco ]; then
             cp -r collected/unit-reports/jacoco dashboard/jacoco
           elif [ -d collected/unit-reports/unit/jacoco ]; then
             cp -r collected/unit-reports/unit/jacoco dashboard/jacoco
           fi
           cp collected/integration-reports/newman.html dashboard/newman.html 2>/dev/null || true
+          # ZAP artifact is reports/dast → collected/dast-zap-reports/...
           cp collected/dast-zap-reports/zap-report.html dashboard/zap-report.html 2>/dev/null || true
+          cp collected/dast-zap-reports/reports/dast/zap-report.html dashboard/zap-report.html 2>/dev/null || true
+          find collected -type f \( -iname 'zap-report.html' -o -iname 'zap*.html' \) -exec cp {} dashboard/zap-report.html \; 2>/dev/null || true
+          if [ ! -f dashboard/zap-report.html ]; then
+            echo '<html><body><h1>ZAP report not found in artifacts</h1></body></html>' > dashboard/zap-report.html
+          fi
+          if [ ! -f dashboard/unit-summary.html ]; then
+            echo '<html><body><h1>Unit summary not found in artifacts</h1></body></html>' > dashboard/unit-summary.html
+          fi
           cp collected/sonar-reports/sonar-summary.html dashboard/sonar-summary.html 2>/dev/null || true
           cp collected/performance-reports/k6/k6-summary.html dashboard/k6-summary.html 2>/dev/null || true
           cp collected/performance-reports/jmeter/jmeter-summary.html dashboard/jmeter-summary.html 2>/dev/null || true
@@ -582,6 +615,11 @@ jobs:
             [ -f "$f" ] || continue
             cp "$f" "dashboard/$(basename "$f")"
           done
+
+          # Also promote flatten-named copies if short names still missing
+          [ -f dashboard/unit-summary.html ] || cp dashboard/unit-reports_reports_unit_unit-summary.html dashboard/unit-summary.html 2>/dev/null || true
+          [ -f dashboard/sast-summary.html ] || cp dashboard/sast-reports_sast-summary.html dashboard/sast-summary.html 2>/dev/null || true
+          [ -f dashboard/zap-report.html ] || cp dashboard/dast-zap-reports_zap-report.html dashboard/zap-report.html 2>/dev/null || true
 
           python3 deploy/ci/generate-html-reports.py index dashboard \
             "SAST|SAST Security Scan Summary|sast-summary.html|Gitleaks + Semgrep 统计与明细" \
