@@ -209,7 +209,7 @@ jobs:
               --docker-password="${HPW}" \
               --dry-run=client -o yaml | kubectl apply -f -
             if kubectl -n "${NS}" get deploy mysql >/dev/null 2>&1; then
-              echo "== mysql already present ù?leaving untouched"
+              echo "== mysql already present - leaving untouched"
               kubectl -n "${NS}" get deploy,pods -l app=mysql -o wide || true
             else
               echo "::warning::mysql deployment not found in ${NS}; app will need an existing DB endpoint"
