@@ -25,7 +25,7 @@ public class LlmGateway {
     }
 
     public Result generate(String question, AiStyle style, String dataScope, Map<String, Object> data) {
-        if (Boolean.TRUE.equals(data.get("permissionDenied"))) {
+        if (data != null && Boolean.TRUE.equals(data.get("permissionDenied"))) {
             Result r = new Result();
             r.answer = String.valueOf(data.get("permissionMessage"));
             r.degraded = true;
