@@ -140,6 +140,18 @@ public class AuthorizationInterceptorTest {
         verify(response).setHeader(eq("Cache-Control"), contains("no-store"));
     }
 
+    @Test
+    public void preHandleRejectsUntrustedOrigin() throws Exception {
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getHeader("Origin")).thenReturn("http://evil.example");
+        when(request.getHeader(AuthorizationInterceptor.LOGIN_TOKEN_KEY)).thenReturn("t");
+        when(tokenService.getTokenEntity("t")).thenReturn(validToken());
+
+        interceptor.preHandle(request, response, handlerMethod("secured"));
+
+        verify(response, never()).setHeader(eq("Access-Control-Allow-Origin"), eq("http://evil.example"));
+    }
+
     private HandlerMethod handlerMethod(String methodName) throws NoSuchMethodException {
         return new HandlerMethod(new TestController(), TestController.class.getDeclaredMethod(methodName));
     }

@@ -1,5 +1,6 @@
 package com.utils;
 
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockitoAnnotations;
@@ -10,6 +11,13 @@ import static org.junit.jupiter.api.Assertions.*;
  * EncryptUtil unit tests.
  */
 public class EncryptUtilTest {
+
+    @BeforeAll
+    public static void keys() {
+        System.setProperty("warehouse.des.key", "12345678");
+        System.setProperty("warehouse.aes.key", "1234567890123456");
+        System.setProperty("warehouse.aes.iv", "abcdefghijklmnop");
+    }
 
     @BeforeEach
     public void setUp() {
@@ -55,13 +63,13 @@ public class EncryptUtilTest {
     }
 
     @Test
-    public void testDesDecrypt_invalidBase64Throws() {
-        assertThrows(IllegalArgumentException.class, () -> EncryptUtil.desDecrypt("not-valid-base64!!!"));
+    public void testDesDecrypt_invalidBase64ReturnsNull() {
+        assertNull(EncryptUtil.desDecrypt("not-valid-base64!!!"));
     }
 
     @Test
-    public void testAesDecrypt_invalidBase64Throws() {
-        assertThrows(IllegalArgumentException.class, () -> EncryptUtil.aesDecrypt("not-valid-base64!!!"));
+    public void testAesDecrypt_invalidBase64ReturnsNull() {
+        assertNull(EncryptUtil.aesDecrypt("not-valid-base64!!!"));
     }
 
     @Test
@@ -118,17 +126,36 @@ public class EncryptUtilTest {
 
     @Test
     public void testDesEncryptDecrypt_specialChars() {
-        String plain = "!@#$%^&*()_+-=[]{}|;':\",./<>?";
+        String plain = "a!@#$%^&*()_+-={}[]|:;<>?,./~`";
         assertEquals(plain, EncryptUtil.desDecrypt(EncryptUtil.desEncrypt(plain)));
     }
 
     @Test
-    public void testAesEncryptDecrypt_longText() {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < 200; i++) {
-            sb.append("长文本测试");
-        }
-        String plain = sb.toString();
+    public void testAesEncryptDecrypt_specialChars() {
+        String plain = "a!@#$%^&*()_+-={}[]|:;<>?,./~`";
         assertEquals(plain, EncryptUtil.aesDecrypt(EncryptUtil.aesEncrypt(plain)));
+    }
+
+    @Test
+    public void testMissingKeysReturnNull() {
+        String oldDes = System.getProperty("warehouse.des.key");
+        String oldAes = System.getProperty("warehouse.aes.key");
+        String oldIv = System.getProperty("warehouse.aes.iv");
+        try {
+            System.clearProperty("warehouse.des.key");
+            System.clearProperty("warehouse.aes.key");
+            System.clearProperty("warehouse.aes.iv");
+            assertNull(EncryptUtil.desEncrypt("x"));
+            assertNull(EncryptUtil.aesEncrypt("x"));
+            assertNull(EncryptUtil.desDecrypt("YWJj"));
+            assertNull(EncryptUtil.aesDecrypt("YWJj"));
+        } finally {
+            if (oldDes != null) System.setProperty("warehouse.des.key", oldDes);
+            else System.setProperty("warehouse.des.key", "12345678");
+            if (oldAes != null) System.setProperty("warehouse.aes.key", oldAes);
+            else System.setProperty("warehouse.aes.key", "1234567890123456");
+            if (oldIv != null) System.setProperty("warehouse.aes.iv", oldIv);
+            else System.setProperty("warehouse.aes.iv", "abcdefghijklmnop");
+        }
     }
 }

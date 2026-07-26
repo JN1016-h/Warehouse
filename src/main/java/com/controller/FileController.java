@@ -1,15 +1,11 @@
 package com.controller;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.Arrays;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
+import java.util.regex.Pattern;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -19,8 +15,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.ResourceUtils;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -42,40 +36,63 @@ import com.utils.R;
 public class FileController{
 	@Autowired
     private ConfigService configService;
+
+	private static final Pattern SAFE_NAME = Pattern.compile("^[a-zA-Z0-9._-]+$");
+
+	private File uploadDir() throws IOException {
+		File path = new File(ResourceUtils.getURL("classpath:static").getPath());
+		if (!path.exists()) {
+			path = new File("");
+		}
+		File upload = new File(path.getAbsolutePath(), "/upload/");
+		if (!upload.exists()) {
+			upload.mkdirs();
+		}
+		return upload;
+	}
+
+	private File resolveUnderUpload(File upload, String fileName) throws IOException {
+		if (StringUtils.isBlank(fileName) || !SAFE_NAME.matcher(fileName).matches()) {
+			throw new EIException("非法文件名");
+		}
+		Path base = upload.getCanonicalFile().toPath().normalize();
+		Path resolved = base.resolve(fileName).normalize();
+		if (!resolved.startsWith(base)) {
+			throw new EIException("非法文件路径");
+		}
+		return resolved.toFile();
+	}
+
 	/**
 	 * 上传文件
 	 */
 	@RequestMapping("/upload")
     @IgnoreAuth
-	public R upload(@RequestParam("file") MultipartFile file,String type) throws Exception {
-		if (file.isEmpty()) {
+	public R upload(@RequestParam("file") MultipartFile file, String type) throws Exception {
+		if (file == null || file.isEmpty()) {
 			throw new EIException("上传文件不能为空");
 		}
-		String fileExt = file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf(".")+1);
-		File path = new File(ResourceUtils.getURL("classpath:static").getPath());
-		if(!path.exists()) {
-		    path = new File("");
+		String original = file.getOriginalFilename();
+		if (StringUtils.isBlank(original) || !original.contains(".")) {
+			throw new EIException("文件名无效");
 		}
-		File upload = new File(path.getAbsolutePath(),"/upload/");
-		if(!upload.exists()) {
-		    upload.mkdirs();
+		String fileExt = original.substring(original.lastIndexOf('.') + 1);
+		if (!SAFE_NAME.matcher(fileExt).matches()) {
+			throw new EIException("非法扩展名");
 		}
-		String fileName = new Date().getTime()+"."+fileExt;
-        if(StringUtils.isNotBlank(type) && type.contains("_template")) {
-            fileName = type + "."+fileExt;
-            new File(upload.getAbsolutePath()+"/"+fileName).deleteOnExit();
+		File upload = uploadDir();
+		String fileName = new Date().getTime() + "." + fileExt;
+        if (StringUtils.isNotBlank(type) && type.contains("_template")) {
+			if (!SAFE_NAME.matcher(type).matches()) {
+				throw new EIException("非法模板类型");
+			}
+            fileName = type + "." + fileExt;
         }
-		File dest = new File(upload.getAbsolutePath()+"/"+fileName);
+		File dest = resolveUnderUpload(upload, fileName);
 		file.transferTo(dest);
-		/**
-  		 * 如果使用idea或者eclipse重启项目，发现之前上传的图片或者文件丢失，将下面一行代码注释打开
-   		 * 请将以下的"D:\\springbootq33sd\\src\\main\\resources\\static\\upload"替换成你本地项目的upload路径，
- 		 * 并且项目路径不能存在中文、空格等特殊字符
- 		 */
-//		FileUtils.copyFile(dest, new File("D:\\springbootq33sd\\src\\main\\resources\\static\\upload"+"/"+fileName)); /**修改了路径以后请将该行最前面的//注释去掉**/
-		if(StringUtils.isNotBlank(type) && type.equals("1")) {
+		if (StringUtils.isNotBlank(type) && type.equals("1")) {
 			ConfigEntity configEntity = configService.selectOne(new EntityWrapper<ConfigEntity>().eq("name", "faceFile"));
-			if(configEntity==null) {
+			if (configEntity == null) {
 				configEntity = new ConfigEntity();
 				configEntity.setName("faceFile");
 				configEntity.setValue(fileName);
@@ -94,24 +111,17 @@ public class FileController{
 	@RequestMapping("/download")
 	public ResponseEntity<byte[]> download(@RequestParam String fileName) {
 		try {
-			File path = new File(ResourceUtils.getURL("classpath:static").getPath());
-			if(!path.exists()) {
-			    path = new File("");
-			}
-			File upload = new File(path.getAbsolutePath(),"/upload/");
-			if(!upload.exists()) {
-			    upload.mkdirs();
-			}
-			File file = new File(upload.getAbsolutePath()+"/"+fileName);
-			if(file.exists()){
-				/*if(!fileService.canRead(file, SessionManager.getSessionUser())){
-					getResponse().sendError(403);
-				}*/
+			File upload = uploadDir();
+			File file = resolveUnderUpload(upload, fileName);
+			if (file.exists() && file.isFile()) {
 				HttpHeaders headers = new HttpHeaders();
-			    headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);    
-			    headers.setContentDispositionFormData("attachment", fileName);    
-			    return new ResponseEntity<byte[]>(FileUtils.readFileToByteArray(file),headers, HttpStatus.CREATED);
+			    headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+			    headers.setContentDispositionFormData("attachment", file.getName());
+			    return new ResponseEntity<byte[]>(FileUtils.readFileToByteArray(file), headers, HttpStatus.CREATED);
 			}
+			return new ResponseEntity<byte[]>(HttpStatus.NOT_FOUND);
+		} catch (EIException e) {
+			return new ResponseEntity<byte[]>(HttpStatus.BAD_REQUEST);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

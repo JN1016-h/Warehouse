@@ -122,9 +122,8 @@ public class UsersController{
 	}
 	
 	/**
-     * 密码重置
+     * 密码重置（需登录；禁止匿名重置）
      */
-    @IgnoreAuth
 	@RequestMapping(value = "/resetPass")
     public R resetPass(String username, HttpServletRequest request){
     	UsersEntity user = userService.selectOne(new EntityWrapper<UsersEntity>().eq("username", username));
@@ -171,6 +170,9 @@ public class UsersController{
     @RequestMapping("/session")
     public R getCurrUser(HttpServletRequest request){
     	Long id = (Long)request.getSession().getAttribute("userId");
+    	if (id == null) {
+    		return R.error(401, "请先登录");
+    	}
         UsersEntity user = userService.selectById(id);
         return R.ok().put("data", user);
     }
@@ -198,7 +200,7 @@ public class UsersController{
     public R update(@RequestBody UsersEntity user){
 //        ValidatorUtils.validateEntity(user);
     	UsersEntity u = userService.selectOne(new EntityWrapper<UsersEntity>().eq("username", user.getUsername()));
-    	if(u!=null && u.getId()!=user.getId() && u.getUsername().equals(user.getUsername())) {
+    	if(u!=null && !java.util.Objects.equals(u.getId(), user.getId()) && u.getUsername().equals(user.getUsername())) {
     		return R.error("用户名已存在。");
     	}
         userService.updateById(user);//全部更新

@@ -34,6 +34,8 @@
 		<sonar.sourceEncoding>UTF-8</sonar.sourceEncoding>
 		<sonar.exclusions>**/src/main/resources/admin/**,**/node_modules/**,**/static/**,**/*.min.js</sonar.exclusions>
 		<sonar.coverage.exclusions>**/src/main/resources/**,**/dto/**,**/entity/**,**/config/**</sonar.coverage.exclusions>
+		<!-- CPD: codegen CRUD boilerplate (entity/dao/vo/view/mapper/service.impl/controller) -->
+		<sonar.cpd.exclusions>**/entity/**,**/dao/**,**/vo/**,**/view/**,**/mapper/**,**/service/impl/**,**/controller/**</sonar.cpd.exclusions>
 	</properties>
 
 	<dependencies>

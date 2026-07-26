@@ -39,6 +39,7 @@ import com.utils.FileUtil;
 import com.utils.MapUtils;
 import com.utils.R;
 import com.utils.CommonUtil;
+import com.utils.SqlSafe;
 /**
  * 通用接口
  */
@@ -50,16 +51,34 @@ public class CommonController{
     private static AipFace client = null;
     
     @Autowired
-    private ConfigService configService;    
+    private ConfigService configService;
+
+	private R rejectIfUnsafe(String tableName, String... columns) {
+		try {
+			SqlSafe.requireAllowedTable(tableName);
+			if (columns != null) {
+				for (String c : columns) {
+					if (StringUtils.isNotBlank(c)) {
+						SqlSafe.requireSafeIdentifier(c, "column");
+					}
+				}
+			}
+			return null;
+		} catch (IllegalArgumentException ex) {
+			return R.error(ex.getMessage());
+		}
+	}
+
 	/**
 	 * 获取table表中的column列表(联动接口)
-	 * @param table
-	 * @param column
-	 * @return
 	 */
 	@IgnoreAuth
 	@RequestMapping("/option/{tableName}/{columnName}")
 	public R getOption(@PathVariable("tableName") String tableName, @PathVariable("columnName") String columnName,@RequestParam(required = false) String conditionColumn,@RequestParam(required = false) String conditionValue,String level,String parent) {
+		R bad = rejectIfUnsafe(tableName, columnName, conditionColumn);
+		if (bad != null) {
+			return bad;
+		}
 		Map<String, Object> params = new HashMap<String, Object>();
 		params.put("table", tableName);
 		params.put("column", columnName);
@@ -88,6 +107,10 @@ public class CommonController{
 	@IgnoreAuth
 	@RequestMapping("/follow/{tableName}/{columnName}")
 	public R getFollowByOption(@PathVariable("tableName") String tableName, @PathVariable("columnName") String columnName, @RequestParam String columnValue) {
+		R bad = rejectIfUnsafe(tableName, columnName);
+		if (bad != null) {
+			return bad;
+		}
 		Map<String, Object> params = new HashMap<String, Object>();
 		params.put("table", tableName);
 		params.put("column", columnName);
@@ -109,12 +132,13 @@ public class CommonController{
 	
 	/**
 	 * 修改table表的sfsh状态
-	 * @param table
-	 * @param map
-	 * @return
 	 */
 	@RequestMapping("/sh/{tableName}")
 	public R sh(@PathVariable("tableName") String tableName, @RequestBody Map<String, Object> map) {
+		R bad = rejectIfUnsafe(tableName);
+		if (bad != null) {
+			return bad;
+		}
 		map.put("table", tableName);
 		commonService.sh(map);
 		return R.ok();
@@ -122,16 +146,15 @@ public class CommonController{
 	
 	/**
 	 * 获取需要提醒的记录数
-	 * @param tableName
-	 * @param columnName
-	 * @param type 1:数字 2:日期
-	 * @param map
-	 * @return
 	 */
 	@IgnoreAuth
 	@RequestMapping("/remind/{tableName}/{columnName}/{type}")
 	public R remindCount(@PathVariable("tableName") String tableName, @PathVariable("columnName") String columnName, 
 						 @PathVariable("type") String type,@RequestParam Map<String, Object> map) {
+		R bad = rejectIfUnsafe(tableName, columnName);
+		if (bad != null) {
+			return bad;
+		}
 		map.put("table", tableName);
 		map.put("column", columnName);
 		map.put("type", type);
@@ -167,6 +190,10 @@ public class CommonController{
 	@IgnoreAuth
 	@RequestMapping("/cal/{tableName}/{columnName}")
 	public R cal(@PathVariable("tableName") String tableName, @PathVariable("columnName") String columnName) {
+		R bad = rejectIfUnsafe(tableName, columnName);
+		if (bad != null) {
+			return bad;
+		}
 		Map<String, Object> params = new HashMap<String, Object>();
 		params.put("table", tableName);
 		params.put("column", columnName);
@@ -180,6 +207,10 @@ public class CommonController{
 	@IgnoreAuth
 	@RequestMapping("/group/{tableName}/{columnName}")
 	public R group(@PathVariable("tableName") String tableName, @PathVariable("columnName") String columnName) {
+		R bad = rejectIfUnsafe(tableName, columnName);
+		if (bad != null) {
+			return bad;
+		}
 		Map<String, Object> params = new HashMap<String, Object>();
 		params.put("table", tableName);
 		params.put("column", columnName);
@@ -201,6 +232,10 @@ public class CommonController{
 	@IgnoreAuth
 	@RequestMapping("/value/{tableName}/{xColumnName}/{yColumnName}")
 	public R value(@PathVariable("tableName") String tableName, @PathVariable("yColumnName") String yColumnName, @PathVariable("xColumnName") String xColumnName) {
+		R bad = rejectIfUnsafe(tableName, xColumnName, yColumnName);
+		if (bad != null) {
+			return bad;
+		}
 		Map<String, Object> params = new HashMap<String, Object>();
 		params.put("table", tableName);
 		params.put("xColumn", xColumnName);
@@ -223,6 +258,13 @@ public class CommonController{
 	@IgnoreAuth
 	@RequestMapping("/value/{tableName}/{xColumnName}/{yColumnName}/{timeStatType}")
 	public R valueDay(@PathVariable("tableName") String tableName, @PathVariable("yColumnName") String yColumnName, @PathVariable("xColumnName") String xColumnName, @PathVariable("timeStatType") String timeStatType) {
+		R bad = rejectIfUnsafe(tableName, xColumnName, yColumnName);
+		if (bad != null) {
+			return bad;
+		}
+		if (!"day".equals(timeStatType) && !"month".equals(timeStatType) && !"year".equals(timeStatType)) {
+			return R.error("Invalid timeStatType");
+		}
 		Map<String, Object> params = new HashMap<String, Object>();
 		params.put("table", tableName);
 		params.put("xColumn", xColumnName);

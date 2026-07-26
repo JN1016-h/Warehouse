@@ -194,6 +194,16 @@ public class UserControllerTest {
     }
 
     @Test
+    public void testSessionUnauthorizedWhenNoUserId() {
+        javax.servlet.http.HttpServletRequest request = org.mockito.Mockito.mock(javax.servlet.http.HttpServletRequest.class);
+        javax.servlet.http.HttpSession session = org.mockito.Mockito.mock(javax.servlet.http.HttpSession.class);
+        org.mockito.Mockito.when(request.getSession()).thenReturn(session);
+        org.mockito.Mockito.when(session.getAttribute("userId")).thenReturn(null);
+        R result = yonghuController.getCurrUser(request);
+        assertEquals(401, result.get("code"));
+    }
+
+    @Test
     public void testResetPass() {
         YonghuEntity user = new YonghuEntity();
         user.setId(1L);

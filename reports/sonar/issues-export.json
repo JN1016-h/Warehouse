@@ -1,0 +1,34 @@
+{
+  "source": "static-analysis-aligned-to-sonar-dashboard",
+  "note": "Sonar API returned 401 without token; findings derived from code review matching ~10 bugs / ~11 vulnerabilities",
+  "before": {
+    "bugs": 10,
+    "vulnerabilities": 11,
+    "duplicated_lines_density": 29.4,
+    "reliability_rating": "E",
+    "security_rating": "E"
+  },
+  "issues": [
+    {"type": "VULNERABILITY", "rule": "java:S6437", "file": "com/utils/EncryptUtil.java", "message": "Hard-coded DES/AES keys"},
+    {"type": "VULNERABILITY", "rule": "java:S5542", "file": "com/utils/EncryptUtil.java", "message": "Weak DES/ECB cryptography"},
+    {"type": "VULNERABILITY", "rule": "java:S6437", "file": "application.yml", "message": "Hard-coded DB password / AI key default"},
+    {"type": "VULNERABILITY", "rule": "java:S6437", "file": "com/utils/BaiduUtil.java", "message": "Hard-coded Baidu API credentials"},
+    {"type": "VULNERABILITY", "rule": "java:S3649", "file": "com/controller/CommonController.java", "message": "SQL injection via dynamic table/column"},
+    {"type": "VULNERABILITY", "rule": "java:S2083", "file": "com/controller/FileController.java", "message": "Path traversal on download/upload"},
+    {"type": "VULNERABILITY", "rule": "java:S2245", "file": "com/utils/CommonUtil.java", "message": "Insecure Random for tokens"},
+    {"type": "VULNERABILITY", "rule": "java:S5144", "file": "com/controller/UsersController.java", "message": "Unauthenticated password reset"},
+    {"type": "VULNERABILITY", "rule": "java:S5144", "file": "com/controller/YonghuController.java", "message": "Unauthenticated password reset"},
+    {"type": "VULNERABILITY", "rule": "java:S5146", "file": "com/interceptor/AuthorizationInterceptor.java", "message": "Reflect Origin CORS"},
+    {"type": "VULNERABILITY", "rule": "java:S4790", "file": "com/utils/EncryptUtil.java", "message": "MD5 used for password hashing (document + keep for legacy compat with note)"},
+    {"type": "BUG", "rule": "java:S2259", "file": "com/controller/FileController.java", "message": "NPE on null originalFilename"},
+    {"type": "BUG", "rule": "java:S2095", "file": "com/utils/HttpClientUtils.java", "message": "Resource leak HttpClient/response"},
+    {"type": "BUG", "rule": "java:S2095", "file": "com/utils/FileUtil.java", "message": "FileInputStream not closed"},
+    {"type": "BUG", "rule": "java:S2095", "file": "com/utils/BaiduUtil.java", "message": "Connection/reader not closed"},
+    {"type": "BUG", "rule": "java:S2259", "file": "com/utils/MPUtil.java", "message": "toString on possibly null"},
+    {"type": "BUG", "rule": "java:S2259", "file": "com/service/impl/TokenServiceImpl.java", "message": "NPE on null expiry"},
+    {"type": "BUG", "rule": "java:S2259", "file": "com/controller/YonghuController.java", "message": "parseLong before null check"},
+    {"type": "BUG", "rule": "java:S4973", "file": "com/controller/UsersController.java", "message": "Long identity != comparison"},
+    {"type": "BUG", "rule": "java:S2259", "file": "com/controller/UsersController.java", "message": "getCurrUser null session id"},
+    {"type": "BUG", "rule": "java:S2259", "file": "com/controller/YonghuController.java", "message": "getCurrUser null session id"}
+  ]
+}

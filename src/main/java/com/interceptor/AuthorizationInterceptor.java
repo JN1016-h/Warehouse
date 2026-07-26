@@ -30,19 +30,29 @@ public class AuthorizationInterceptor implements HandlerInterceptor {
 
     public static final String LOGIN_TOKEN_KEY = "Token";
 
+    private static final java.util.Set<String> ALLOWED_ORIGINS = new java.util.HashSet<>(
+            java.util.Arrays.asList(
+                    "http://121.40.253.17:30080",
+                    "http://121.40.253.17:8080",
+                    "http://localhost:8080",
+                    "http://127.0.0.1:8080",
+                    "http://localhost:30080",
+                    "http://127.0.0.1:30080"
+            ));
+
     @Autowired
     private TokenService tokenService;
     
 	@Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
 
-		//支持跨域请求
+		//支持跨域请求（Origin 白名单，禁止反射任意 Origin）
         response.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE");
         response.setHeader("Access-Control-Max-Age", "3600");
         response.setHeader("Access-Control-Allow-Credentials", "true");
         response.setHeader("Access-Control-Allow-Headers", "x-requested-with,request-source,Token, Origin,imgType, Content-Type, cache-control,postman-token,Cookie, Accept,authorization");
         String origin = request.getHeader("Origin");
-        if (StringUtils.isNotBlank(origin)) {
+        if (StringUtils.isNotBlank(origin) && isAllowedOrigin(origin)) {
         	response.setHeader("Access-Control-Allow-Origin", origin);
         }
         // 避免 CDN/浏览器缓存未登录的 401，导致登录后仍拿到旧响应
@@ -109,5 +119,21 @@ public class AuthorizationInterceptor implements HandlerInterceptor {
 		}
 //				throw new EIException("请先登录", 401);
 		return false;
+    }
+
+    private boolean isAllowedOrigin(String origin) {
+        if (ALLOWED_ORIGINS.contains(origin)) {
+            return true;
+        }
+        String extra = System.getenv("CORS_ALLOWED_ORIGINS");
+        if (StringUtils.isBlank(extra)) {
+            return false;
+        }
+        for (String o : extra.split(",")) {
+            if (origin.equals(o.trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 }

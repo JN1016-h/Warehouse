@@ -11,6 +11,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -18,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 public class UsersControllerTest {
@@ -119,6 +122,16 @@ public class UsersControllerTest {
         when(userService.selectById(1L)).thenReturn(new UsersEntity());
         R result = controller.getCurrUser(ControllerTestSupport.mockAdminRequest());
         assertEquals(0, result.get("code"));
+    }
+
+    @Test
+    public void testSessionUnauthorizedWhenNoUserId() {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        HttpSession session = mock(HttpSession.class);
+        when(request.getSession()).thenReturn(session);
+        when(session.getAttribute("userId")).thenReturn(null);
+        R result = controller.getCurrUser(request);
+        assertEquals(401, result.get("code"));
     }
 
     @Test

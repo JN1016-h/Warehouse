@@ -201,4 +201,27 @@ public class CommonControllerTest {
         R result = controller.valueDay("yonghu", "colY", "colX", "month");
         assertEquals(0, result.get("code"));
     }
+
+    @Test
+    public void testRejectsUnsafeTableOnOption() {
+        R result = controller.getOption("users;drop", "id", null, null, null, null);
+        assertEquals(500, result.get("code"));
+    }
+
+    @Test
+    public void testRejectsUnsafeTableOnShAndCal() {
+        assertEquals(500, controller.sh("evil", new HashMap<String, Object>()).get("code"));
+        assertEquals(500, controller.cal("evil", "id").get("code"));
+        assertEquals(500, controller.group("evil", "id").get("code"));
+        assertEquals(500, controller.value("evil", "y", "x").get("code"));
+        assertEquals(500, controller.valueDay("evil", "y", "x", "day").get("code"));
+        assertEquals(500, controller.remindCount("evil", "id", "1", new HashMap<String, Object>()).get("code"));
+        assertEquals(500, controller.getFollowByOption("evil", "id", "1").get("code"));
+    }
+
+    @Test
+    public void testRejectsBadTimeStatType() {
+        R result = controller.valueDay("yonghu", "colY", "colX", "day;drop");
+        assertEquals(500, result.get("code"));
+    }
 }

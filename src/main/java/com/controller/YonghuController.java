@@ -173,14 +173,16 @@ public class YonghuController {
     @RequestMapping("/session")
     public R getCurrUser(HttpServletRequest request){
     	Long id = (Long)request.getSession().getAttribute("userId");
+    	if (id == null) {
+    		return R.error(401, "请先登录");
+    	}
         YonghuEntity u = yonghuService.selectById(id);
         return R.ok().put("data", u);
     }
     
     /**
-     * 密码重置
+     * 密码重置（需登录；禁止匿名重置）
      */
-    @IgnoreAuth
 	@RequestMapping(value = "/resetPass")
     public R resetPass(String username, HttpServletRequest request){
     	YonghuEntity u = yonghuService.selectOne(new EntityWrapper<YonghuEntity>().eq("yonghuzhanghao", username));
@@ -388,10 +390,18 @@ public class YonghuController {
      */
     @RequestMapping("/updateUserRole")
     public R updateUserRole(@RequestBody Map<String, Object> params) {
-        Long userId = Long.parseLong(params.get("userId").toString());
+        if (params == null || params.get("userId") == null || params.get("role") == null) {
+            return R.error("用户ID和角色不能为空");
+        }
+        Long userId;
+        try {
+            userId = Long.parseLong(params.get("userId").toString());
+        } catch (NumberFormatException e) {
+            return R.error("用户ID无效");
+        }
         String roleStr = params.get("role").toString();
         
-        if (userId == null || roleStr == null || roleStr.isEmpty()) {
+        if (roleStr == null || roleStr.isEmpty()) {
             return R.error("用户ID和角色不能为空");
         }
         

@@ -1,47 +1,40 @@
 package com.utils;
 
-import java.util.Random;
-import java.util.ArrayList;
+import java.security.SecureRandom;
 import org.springframework.stereotype.Component;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.*;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.Objects;
-import com.alibaba.fastjson.JSONObject;
-import org.springframework.beans.factory.annotation.Autowired;
 
 @Component
 public class CommonUtil {
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
 	/**
-     * 获取随机字符串
-     *
-     * @param num
-     * @return
+     * 获取随机字符串（SecureRandom，用于 token 等安全场景）
      */
     public static String getRandomString(Integer num) {
         String base = "abcdefghijklmnopqrstuvwxyz0123456789";
-        Random random = new Random();
-        StringBuffer sb = new StringBuffer();
-        for (int i = 0; i < num; i++) {
-            int number = random.nextInt(base.length());
+        StringBuilder sb = new StringBuilder(num == null ? 0 : num);
+        int n = num == null ? 0 : num;
+        for (int i = 0; i < n; i++) {
+            int number = SECURE_RANDOM.nextInt(base.length());
             sb.append(base.charAt(number));
         }
         return sb.toString();
     }
 
 	/**
-	 * 获取随机验证码
-	 *
-	 * @param num
-	 * @return
+	 * 获取随机验证码（SecureRandom）
 	 */
 	public static String getRandomNumber(Integer num) {
 	    String base = "0123456789";
-	    Random random = new Random();
-	    StringBuffer sb = new StringBuffer();
-	    for (int i = 0; i < num; i++) {
-	        int number = random.nextInt(base.length());
+	    StringBuilder sb = new StringBuilder(num == null ? 0 : num);
+	    int n = num == null ? 0 : num;
+	    for (int i = 0; i < n; i++) {
+	        int number = SECURE_RANDOM.nextInt(base.length());
 	        sb.append(base.charAt(number));
 	    }
 	    return sb.toString();

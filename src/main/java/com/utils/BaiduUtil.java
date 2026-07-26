@@ -37,6 +37,9 @@ public class BaiduUtil {
             //拼装url
             String url = "http://api.map.baidu.com/reverse_geocoding/v3/?ak="+key+"&output=json&coordtype=wgs84ll&location="+location;
             String result = HttpClientUtils.doGet(url);
+            if (result == null || result.isEmpty()) {
+                return null;
+            }
             JSONObject o = new JSONObject(result);
             Map<String, String> area = new HashMap<>();
 			area.put("province", o.getJSONObject("result").getJSONObject("addressComponent").getString("province"));
@@ -69,30 +72,20 @@ public class BaiduUtil {
                 + "&client_secret=" + sk;
         try {
             URL realUrl = new URL(getAccessTokenUrl);
-            // 打开和URL之间的连接
             HttpURLConnection connection = (HttpURLConnection) realUrl.openConnection();
             connection.setRequestMethod("GET");
             connection.connect();
-            // 获取所有响应头字段
-            Map<String, List<String>> map = connection.getHeaderFields();
-            // 遍历所有的响应头字段
-            for (String key : map.keySet()) {
-                System.err.println(key + "--->" + map.get(key));
+            StringBuilder result = new StringBuilder();
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
+                String line;
+                while ((line = in.readLine()) != null) {
+                    result.append(line);
+                }
+            } finally {
+                connection.disconnect();
             }
-            // 定义 BufferedReader输入流来读取URL的响应
-            BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-            String result = "";
-            String line;
-            while ((line = in.readLine()) != null) {
-                result += line;
-            }
-            /**
-             * 返回结果示例
-             */
-            System.err.println("result:" + result);
-            org.json.JSONObject jsonObject = new org.json.JSONObject(result);
-            String access_token = jsonObject.getString("access_token");
-            return access_token;
+            org.json.JSONObject jsonObject = new org.json.JSONObject(result.toString());
+            return jsonObject.getString("access_token");
         } catch (Exception e) {
             System.err.printf("获取token失败！");
             e.printStackTrace(System.err);
@@ -100,12 +93,21 @@ public class BaiduUtil {
         return null;
     }
 
-    //设置APPID/AK/SK
-    public static final String APP_ID = "49214550";
-    public static final String API_KEY = "7Otjpv2kn0ljQk45qXOXh5MO";
-    public static final String SECRET_KEY = "BMfbXRbTIVaB4C3SbRTtGqDv1wHDvyXS";
-    public static final String ACCESS_KEY = "9dd9b2ea56b042c6a468bfeada1209a3";
-    public static final String ACCESS_SECRET_KEY = "45a0aa98b86b4c54b9dc8ede3cc67274";
+    // Credentials from env (BAIDU_APP_ID / BAIDU_API_KEY / ...); never hard-code secrets in source.
+    public static final String APP_ID = env("BAIDU_APP_ID");
+    public static final String API_KEY = env("BAIDU_API_KEY");
+    public static final String SECRET_KEY = env("BAIDU_SECRET_KEY");
+    public static final String ACCESS_KEY = env("BAIDU_ACCESS_KEY");
+    public static final String ACCESS_SECRET_KEY = env("BAIDU_ACCESS_SECRET_KEY");
+
+    private static String env(String name) {
+        String v = System.getenv(name);
+        if (v != null && !v.isEmpty()) {
+            return v;
+        }
+        v = System.getProperty(name.toLowerCase().replace('_', '.'));
+        return v == null ? "" : v;
+    }
     private static AipOcr ocrClient = null;
 
     /**

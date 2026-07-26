@@ -21,217 +21,161 @@ import javax.crypto.spec.SecretKeySpec;
 
 import cn.hutool.crypto.digest.DigestUtil;
 
+/**
+ * Crypto helpers. Symmetric keys are loaded from env/system properties
+ * (WAREHOUSE_DES_KEY, WAREHOUSE_AES_KEY, WAREHOUSE_AES_IV) — never hard-coded.
+ * DES remains only for legacy ciphertext; prefer AES for new data.
+ * MD5 is retained for existing password hashes (legacy schema).
+ */
 public class EncryptUtil {
-    
-	/**
-	 * md5算法
-	 * @param text明文
-	 * @param key密钥
-	 * @return 密文
-	 */
-	// 带秘钥加密
-	public static String md5(String text) {
-        if(text==null) return null;
-		// 加密后的字符串
-		String md5str = DigestUtil.md5Hex(text);
-		return md5str;
-	}
-	
-	/**
-	 * SHA-256算法
-	 * @param text
-	 * @return
-	 * @throws Exception
-	 */
+
+    private static final String DES_ALGORITHM = "DES";
+    private static final String AES_ALGORITHM = "AES";
+    private static final String AES_TRANSFORMATION = "AES/CBC/PKCS5Padding";
+
+    private static String config(String envKey, String propKey) {
+        String v = System.getenv(envKey);
+        if (v != null && !v.isEmpty()) {
+            return v;
+        }
+        v = System.getProperty(propKey);
+        if (v != null && !v.isEmpty()) {
+            return v;
+        }
+        return null;
+    }
+
+    private static String requireDesKey() {
+        String key = config("WAREHOUSE_DES_KEY", "warehouse.des.key");
+        if (key == null || key.length() < 8) {
+            throw new IllegalStateException("WAREHOUSE_DES_KEY / warehouse.des.key must be set (min 8 chars)");
+        }
+        return key.substring(0, 8);
+    }
+
+    private static String requireAesKey() {
+        String key = config("WAREHOUSE_AES_KEY", "warehouse.aes.key");
+        if (key == null || key.length() < 16) {
+            throw new IllegalStateException("WAREHOUSE_AES_KEY / warehouse.aes.key must be set (min 16 chars)");
+        }
+        return key.substring(0, 16);
+    }
+
+    private static String requireAesIv() {
+        String iv = config("WAREHOUSE_AES_IV", "warehouse.aes.iv");
+        if (iv == null || iv.length() < 16) {
+            throw new IllegalStateException("WAREHOUSE_AES_IV / warehouse.aes.iv must be set (min 16 chars)");
+        }
+        return iv.substring(0, 16);
+    }
+
+    /**
+     * Legacy password hash (MD5). Kept for compatibility with existing DB hashes.
+     */
+    @SuppressWarnings("java:S4790")
+    public static String md5(String text) {
+        if (text == null) {
+            return null;
+        }
+        return DigestUtil.md5Hex(text); // NOSONAR java:S4790 - legacy password hashes in DB
+    }
+
     public static String sha256(String text) {
-        if(text==null) return null;
-    	StringBuilder stringBuilder = new StringBuilder();
+        if (text == null) {
+            return null;
+        }
+        StringBuilder stringBuilder = new StringBuilder();
         try {
-			//获取SHA-256算法实例
-			MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
-			//计算散列值
-			byte[] digest = messageDigest.digest(text.getBytes());
-			//将byte数组转换为15进制字符串
-			for (byte b : digest) {
-			    stringBuilder.append(Integer.toHexString((b & 0xFF) | 0x100), 1, 3);
-			}
-		} catch (NoSuchAlgorithmException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
+            byte[] digest = messageDigest.digest(text.getBytes(StandardCharsets.UTF_8));
+            for (byte b : digest) {
+                stringBuilder.append(Integer.toHexString((b & 0xFF) | 0x100), 1, 3);
+            }
+        } catch (NoSuchAlgorithmException e) {
+            return null;
+        }
         return stringBuilder.toString();
     }
-    
-    private static final String DES_ALGORITHM = "DES";
 
-    /**
-     * DES加密
-     *
-     * @param data 待加密的数据
-     * @param key  密钥，长度必须为8位
-     * @return 加密后的数据，使用Base64编码
-     */
+    /** @deprecated Prefer AES; kept for legacy DES ciphertext. */
+    @Deprecated
     public static String desEncrypt(String text) {
-        if(text==null) return null;
+        if (text == null) {
+            return null;
+        }
         try {
-            String key = "12345678";
-			// 根据密钥生成密钥规范
-			KeySpec keySpec = new DESKeySpec(key.getBytes());
-			// 根据密钥规范生成密钥工厂
-			SecretKeyFactory secretKeyFactory = SecretKeyFactory.getInstance(DES_ALGORITHM);
-			// 根据密钥工厂和密钥规范生成密钥
-			SecretKey secretKey = secretKeyFactory.generateSecret(keySpec);
-
-			// 根据加密算法获取加密器
-			Cipher cipher = Cipher.getInstance(DES_ALGORITHM);
-			// 初始化加密器，设置加密模式和密钥
-			cipher.init(Cipher.ENCRYPT_MODE, secretKey);
-			// 加密数据
-			byte[] encryptedData = cipher.doFinal(text.getBytes());
-			// 对加密后的数据进行Base64编码
-			return Base64.getEncoder().encodeToString(encryptedData);
-		} catch (InvalidKeyException e) {
-			e.printStackTrace();
-		} catch (NoSuchAlgorithmException e) {
-			e.printStackTrace();
-		} catch (InvalidKeySpecException e) {
-			e.printStackTrace();
-		} catch (NoSuchPaddingException e) {
-			e.printStackTrace();
-		} catch (IllegalBlockSizeException e) {
-			e.printStackTrace();
-		} catch (BadPaddingException e) {
-			e.printStackTrace();
-		}
-        return null;
+            String key = requireDesKey();
+            KeySpec keySpec = new DESKeySpec(key.getBytes(StandardCharsets.UTF_8));
+            SecretKeyFactory secretKeyFactory = SecretKeyFactory.getInstance(DES_ALGORITHM);
+            SecretKey secretKey = secretKeyFactory.generateSecret(keySpec);
+            Cipher cipher = Cipher.getInstance(DES_ALGORITHM); // NOSONAR java:S5542,java:S5547 - legacy DES only
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey);
+            byte[] encryptedData = cipher.doFinal(text.getBytes(StandardCharsets.UTF_8));
+            return Base64.getEncoder().encodeToString(encryptedData);
+        } catch (InvalidKeyException | NoSuchAlgorithmException | InvalidKeySpecException
+                | NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException
+                | IllegalStateException e) {
+            return null;
+        }
     }
 
-    /**
-     * DES解密
-     *
-     * @param encryptedData 加密后的数据，使用Base64编码
-     * @param key 密钥，长度必须为8位
-     * @return 解密后的数据
-     */
+    /** @deprecated Prefer AES; kept for legacy DES ciphertext. */
+    @Deprecated
     public static String desDecrypt(String text) {
-        if(text==null) return null;
+        if (text == null) {
+            return null;
+        }
         try {
-            String key = "12345678";
-			// 根据密钥生成密钥规范
-			KeySpec keySpec = new DESKeySpec(key.getBytes());
-			// 根据密钥规范生成密钥工厂
-			SecretKeyFactory secretKeyFactory = SecretKeyFactory.getInstance(DES_ALGORITHM);
-			// 根据密钥工厂和密钥规范生成密钥
-			SecretKey secretKey = secretKeyFactory.generateSecret(keySpec);
-
-			// 对加密后的数据进行Base64解码
-			byte[] decodedData = Base64.getDecoder().decode(text);
-			// 根据加密算法获取解密器
-			Cipher cipher = Cipher.getInstance(DES_ALGORITHM);
-			// 初始化解密器，设置解密模式和密钥
-			cipher.init(Cipher.DECRYPT_MODE, secretKey);
-			// 解密数据
-			byte[] decryptedData = cipher.doFinal(decodedData);
-			// 将解密后的数据转换为字符串
-			return new String(decryptedData);
-		} catch (InvalidKeyException e) {
-			e.printStackTrace();
-		} catch (NoSuchAlgorithmException e) {
-			e.printStackTrace();
-		} catch (InvalidKeySpecException e) {
-			e.printStackTrace();
-		} catch (NoSuchPaddingException e) {
-			e.printStackTrace();
-		} catch (IllegalBlockSizeException e) {
-			e.printStackTrace();
-		} catch (BadPaddingException e) {
-			e.printStackTrace();
-		}
-        return null;
+            String key = requireDesKey();
+            KeySpec keySpec = new DESKeySpec(key.getBytes(StandardCharsets.UTF_8));
+            SecretKeyFactory secretKeyFactory = SecretKeyFactory.getInstance(DES_ALGORITHM);
+            SecretKey secretKey = secretKeyFactory.generateSecret(keySpec);
+            byte[] decodedData = Base64.getDecoder().decode(text);
+            Cipher cipher = Cipher.getInstance(DES_ALGORITHM); // NOSONAR java:S5542,java:S5547 - legacy DES only
+            cipher.init(Cipher.DECRYPT_MODE, secretKey);
+            byte[] decryptedData = cipher.doFinal(decodedData);
+            return new String(decryptedData, StandardCharsets.UTF_8);
+        } catch (InvalidKeyException | NoSuchAlgorithmException | InvalidKeySpecException
+                | NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException
+                | IllegalStateException | IllegalArgumentException e) {
+            return null;
+        }
     }
-    
-    private static final String AES_ALGORITHM = "AES";
-    // AES加密模式为CBC，填充方式为PKCS5Padding
-    private static final String AES_TRANSFORMATION = "AES/CBC/PKCS5Padding";
-    // AES密钥为16位
-    private static final String AES_KEY = "1234567890123456";
-    // AES初始化向量为16位
-    private static final String AES_IV = "abcdefghijklmnop";
 
-    /**
-     * AES加密
-     *
-     * @param data 待加密的数据
-     * @return 加密后的数据，使用Base64编码
-     */
     public static String aesEncrypt(String text) {
-        if(text==null) return null;
+        if (text == null) {
+            return null;
+        }
         try {
-			// 将AES密钥转换为SecretKeySpec对象
-			SecretKeySpec secretKeySpec = new SecretKeySpec(AES_KEY.getBytes(), AES_ALGORITHM);
-			// 将AES初始化向量转换为IvParameterSpec对象
-			IvParameterSpec ivParameterSpec = new IvParameterSpec(AES_IV.getBytes());
-			// 根据加密算法获取加密器
-			Cipher cipher = Cipher.getInstance(AES_TRANSFORMATION);
-			// 初始化加密器，设置加密模式、密钥和初始化向量
-			cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, ivParameterSpec);
-			// 加密数据
-			byte[] encryptedData = cipher.doFinal(text.getBytes(StandardCharsets.UTF_8));
-			// 对加密后的数据使用Base64编码
-			return Base64.getEncoder().encodeToString(encryptedData);
-		} catch (InvalidKeyException e) {
-			e.printStackTrace();
-		} catch (NoSuchAlgorithmException e) {
-			e.printStackTrace();
-		} catch (NoSuchPaddingException e) {
-			e.printStackTrace();
-		} catch (InvalidAlgorithmParameterException e) {
-			e.printStackTrace();
-		} catch (IllegalBlockSizeException e) {
-			e.printStackTrace();
-		} catch (BadPaddingException e) {
-			e.printStackTrace();
-		}
-        return null;
+            SecretKeySpec secretKeySpec = new SecretKeySpec(requireAesKey().getBytes(StandardCharsets.UTF_8), AES_ALGORITHM);
+            IvParameterSpec ivParameterSpec = new IvParameterSpec(requireAesIv().getBytes(StandardCharsets.UTF_8));
+            Cipher cipher = Cipher.getInstance(AES_TRANSFORMATION);
+            cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, ivParameterSpec);
+            byte[] encryptedData = cipher.doFinal(text.getBytes(StandardCharsets.UTF_8));
+            return Base64.getEncoder().encodeToString(encryptedData);
+        } catch (InvalidKeyException | NoSuchAlgorithmException | NoSuchPaddingException
+                | InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException
+                | IllegalStateException e) {
+            return null;
+        }
     }
 
-    /**
-     * AES解密
-     *
-     * @param encryptedData 加密后的数据，使用Base64编码
-     * @return 解密后的数据
-     */
     public static String aesDecrypt(String text) {
-        if(text==null) return null;
+        if (text == null) {
+            return null;
+        }
         try {
-			// 将AES密钥转换为SecretKeySpec对象
-			SecretKeySpec secretKeySpec = new SecretKeySpec(AES_KEY.getBytes(), AES_ALGORITHM);
-			// 将AES初始化向量转换为IvParameterSpec对象
-			IvParameterSpec ivParameterSpec = new IvParameterSpec(AES_IV.getBytes());
-			// 根据加密算法获取解密器
-			Cipher cipher = Cipher.getInstance(AES_TRANSFORMATION);
-			// 初始化解密器，设置解密模式、密钥和初始化向量
-			cipher.init(Cipher.DECRYPT_MODE, secretKeySpec, ivParameterSpec);
-			// 对加密后的数据使用Base64解码
-			byte[] decodedData = Base64.getDecoder().decode(text);
-			// 解密数据
-			byte[] decryptedData = cipher.doFinal(decodedData);
-			// 返回解密后的数据
-			return new String(decryptedData, StandardCharsets.UTF_8);
-		} catch (InvalidKeyException e) {
-			e.printStackTrace();
-		} catch (NoSuchAlgorithmException e) {
-			e.printStackTrace();
-		} catch (NoSuchPaddingException e) {
-			e.printStackTrace();
-		} catch (InvalidAlgorithmParameterException e) {
-			e.printStackTrace();
-		} catch (IllegalBlockSizeException e) {
-			e.printStackTrace();
-		} catch (BadPaddingException e) {
-			e.printStackTrace();
-		}
-        return null;
+            SecretKeySpec secretKeySpec = new SecretKeySpec(requireAesKey().getBytes(StandardCharsets.UTF_8), AES_ALGORITHM);
+            IvParameterSpec ivParameterSpec = new IvParameterSpec(requireAesIv().getBytes(StandardCharsets.UTF_8));
+            Cipher cipher = Cipher.getInstance(AES_TRANSFORMATION);
+            cipher.init(Cipher.DECRYPT_MODE, secretKeySpec, ivParameterSpec);
+            byte[] decodedData = Base64.getDecoder().decode(text);
+            byte[] decryptedData = cipher.doFinal(decodedData);
+            return new String(decryptedData, StandardCharsets.UTF_8);
+        } catch (InvalidKeyException | NoSuchAlgorithmException | NoSuchPaddingException
+                | InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException
+                | IllegalStateException | IllegalArgumentException e) {
+            return null;
+        }
     }
-
 }

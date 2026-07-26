@@ -71,7 +71,8 @@ public class TokenServiceImpl extends ServiceImpl<TokenDao, TokenEntity> impleme
 	@Override
 	public TokenEntity getTokenEntity(String token) {
 		TokenEntity tokenEntity = this.selectOne(new EntityWrapper<TokenEntity>().eq("token", token));
-		if(tokenEntity == null || tokenEntity.getExpiratedtime().getTime()<new Date().getTime()) {
+		if (tokenEntity == null || tokenEntity.getExpiratedtime() == null
+				|| tokenEntity.getExpiratedtime().getTime() < new Date().getTime()) {
 			return null;
 		}
 		return tokenEntity;

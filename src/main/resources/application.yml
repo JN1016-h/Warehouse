@@ -10,14 +10,14 @@ server:
 spring:
     datasource:
         driverClassName: com.mysql.cj.jdbc.Driver
-        url: jdbc:mysql://127.0.0.1:3306/springboot38hdw40x?useUnicode=true&characterEncoding=utf-8&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=GMT%2B8&useSSL=false
-        username: root
-        password: 123123
+        url: jdbc:mysql://127.0.0.1:3306/springboot38hdw40x?useUnicode=true&characterEncoding=utf-8&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true
+        username: ${SPRING_DATASOURCE_USERNAME:root}
+        password: ${SPRING_DATASOURCE_PASSWORD:}
 
 #        driverClassName: com.microsoft.sqlserver.jdbc.SQLServerDriver
 #        url: jdbc:sqlserver://127.0.0.1:1433;DatabaseName=springboot38hdw40x
 #        username: sa
-#        password: 123456
+#        password: ${SPRING_DATASOURCE_PASSWORD:}
 
     servlet:
       multipart:
@@ -31,7 +31,7 @@ ai:
   enabled: true
   provider: openai-compatible
   base-url: https://ai.imge.cc.cd/v1
-  api-key: ${AI_API_KEY:sk-0305a2be4edc60f5dedc92194de47d1d92eb83289488bba75351fd44391b6425}
+  api-key: ${AI_API_KEY:}
   model: qwen/qwen3.5-35b-a3b
   # 思考模型需要更大输出额度；超时后自动本地统计降级
   timeout-ms: 90000

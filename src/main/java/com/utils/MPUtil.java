@@ -71,10 +71,14 @@ public class MPUtil {
 				if(i>0) wrapper.and();
 				Map.Entry<String, Object> entry = it.next();
 				String key = entry.getKey();
-				if(entry.getValue().toString().contains("%")) {
-					wrapper.like(key, entry.getValue().toString().replace("%", ""));
+				Object val = entry.getValue();
+				if (val == null) {
+					continue;
+				}
+				if(val.toString().contains("%")) {
+					wrapper.like(key, val.toString().replace("%", ""));
 				} else {
-					wrapper.eq(key, entry.getValue());
+					wrapper.eq(key, val);
 				}
 				i++;
 			}
@@ -104,16 +108,20 @@ public class MPUtil {
 		public static Wrapper between(Wrapper wrapper,Map<String, Object> params) {
 			for(String key : params.keySet()) {
 				String columnName = "";
+				Object pval = params.get(key);
+				if (pval == null) {
+					continue;
+				}
 				if(key.endsWith("_start")) {
 					columnName = key.substring(0, key.indexOf("_start"));
-					if(StringUtils.isNotBlank(params.get(key).toString())) {
-						wrapper.ge(columnName, params.get(key));
+					if(StringUtils.isNotBlank(pval.toString())) {
+						wrapper.ge(columnName, pval);
 					}
 				}
 				if(key.endsWith("_end")) {
 					columnName = key.substring(0, key.indexOf("_end"));
-					if(StringUtils.isNotBlank(params.get(key).toString())) {
-						wrapper.le(columnName, params.get(key));
+					if(StringUtils.isNotBlank(pval.toString())) {
+						wrapper.le(columnName, pval);
 					}
 				}
 			}
