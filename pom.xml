@@ -236,6 +236,8 @@
                <artifactId>maven-surefire-plugin</artifactId>
                <configuration>
                    <skipTests>${skipTests}</skipTests>
+                   <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
+                   <useFile>true</useFile>
                </configuration>
            </plugin>
 			<plugin>

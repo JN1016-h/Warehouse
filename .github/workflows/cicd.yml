@@ -92,20 +92,25 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p reports/unit
+          set +e
           mvn -B -ntp test jacoco:report -DskipTests=false -Dmaven.test.skip=false \
             | tee reports/unit/mvn-test.log
+          MVN_RC=${PIPESTATUS[0]}
+          set -e
+          echo "mvn_exit=${MVN_RC}" | tee -a reports/unit/unit-execution-meta.txt
+          exit "${MVN_RC}"
 
       - name: Build unit HTML dashboard
         if: always()
         run: |
+          set -euo pipefail
           mkdir -p reports/unit/surefire
           if [ -d target/surefire-reports ]; then
             cp -a target/surefire-reports/. reports/unit/surefire/ || true
           fi
-          # fall back: any TEST-*.xml under target/
-          if ! ls reports/unit/surefire/TEST-*.xml >/dev/null 2>&1; then
-            find target -name 'TEST-*.xml' -exec cp -f {} reports/unit/surefire/ \; 2>/dev/null || true
-          fi
+          find target -name 'TEST-*.xml' -print -exec cp -f {} reports/unit/surefire/ \; 2>/dev/null || true
+          echo "== surefire files"
+          ls -la reports/unit/surefire | head -n 40 || true
           python3 deploy/ci/generate-html-reports.py unit reports/unit reports/unit/surefire
           if [ -d target/site/jacoco ]; then
             cp -r target/site/jacoco reports/unit/jacoco
@@ -117,7 +122,12 @@ jobs:
             echo "time_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             wc -l reports/unit/mvn-test.log 2>/dev/null || true
             find reports/unit/surefire -name 'TEST-*.xml' 2>/dev/null | wc -l | awk '{print "surefire_xmls="$1}'
-          } > reports/unit/unit-execution-meta.txt
+            grep -E 'Tests run:' reports/unit/mvn-test.log | tail -n 5 || true
+          } >> reports/unit/unit-execution-meta.txt
+          # sanity: summary must not stay at zero when XML exists
+          grep -q 'No surefire XML found' reports/unit/unit-summary.html && \
+            ls reports/unit/surefire/TEST-*.xml >/dev/null 2>&1 && \
+            echo "::warning::surefire XML present but summary empty — check parser" || true
 
       - name: Upload unit reports
         if: always()

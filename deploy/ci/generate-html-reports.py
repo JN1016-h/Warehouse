@@ -210,24 +210,79 @@ def checkov_html(out: Path, json_path: Path, title: str) -> None:
 
 
 def unit_html(out: Path, surefire_dir: Path) -> None:
-    xmls = list(surefire_dir.glob("TEST-*.xml")) if surefire_dir.exists() else []
+    xmls: list[Path] = []
+    if surefire_dir.exists():
+        xmls = sorted(surefire_dir.glob("TEST-*.xml"))
+        if not xmls:
+            xmls = sorted(surefire_dir.rglob("TEST-*.xml"))
     tests = fails = errors = skipped = 0
     rows = []
     import re
+    from xml.etree import ElementTree as ET
+
+    def _attr_int(el: ET.Element, *names: str) -> int:
+        for n in names:
+            v = el.attrib.get(n)
+            if v is not None and str(v).strip() != "":
+                try:
+                    return int(float(v))
+                except ValueError:
+                    pass
+        return 0
+
     for xp in xmls:
-        text = xp.read_text(encoding="utf-8", errors="ignore")
-        m = re.search(r'tests="(\d+)".*?failures="(\d+)".*?errors="(\d+)".*?skipped="(\d+)"', text, re.S)
-        if not m:
-            m = re.search(r'tests="(\d+)" failures="(\d+)" errors="(\d+)" skipped="(\d+)"', text)
-        if m:
-            t, f, e, s = map(int, m.groups())
-            tests += t
-            fails += f
-            errors += e
-            skipped += s
-            status = "FAIL" if f or e else "OK"
-            rows.append(f"<tr><td>{html.escape(xp.name)}</td><td>{t}</td><td>{f}</td><td>{e}</td><td>{s}</td>"
-                        f"<td><span class='sev sev-{'ERROR' if status=='FAIL' else 'INFO'}'>{status}</span></td></tr>")
+        t = f = e = s = 0
+        parsed = False
+        try:
+            root = ET.parse(xp).getroot()
+            # root may be testsuite, or testsuites wrapping suites
+            suites = [root] if root.tag.endswith("testsuite") else []
+            suites.extend([c for c in root if c.tag.endswith("testsuite")])
+            if not suites and root.tag.endswith("testsuites"):
+                suites = [c for c in root if c.tag.endswith("testsuite")]
+            for suite in suites or [root]:
+                t += _attr_int(suite, "tests")
+                f += _attr_int(suite, "failures", "failure")
+                e += _attr_int(suite, "errors", "error")
+                s += _attr_int(suite, "skipped", "disabled")
+                parsed = True
+        except Exception:
+            parsed = False
+        if not parsed:
+            text = xp.read_text(encoding="utf-8", errors="ignore")
+            # attribute order varies across Surefire versions — read each attr alone
+            def one(name: str) -> int:
+                m = re.search(rf'\b{name}="(\d+)"', text)
+                return int(m.group(1)) if m else 0
+
+            t, f, e, s = one("tests"), one("failures"), one("errors"), one("skipped")
+        tests += t
+        fails += f
+        errors += e
+        skipped += s
+        status = "FAIL" if f or e else "OK"
+        rows.append(
+            f"<tr><td>{html.escape(xp.stem.replace('TEST-', ''))}</td>"
+            f"<td>{t}</td><td>{f}</td><td>{e}</td><td>{s}</td>"
+            f"<td><span class='sev sev-{'ERROR' if status == 'FAIL' else 'INFO'}'>{status}</span></td></tr>"
+        )
+    # fallback: parse Maven surefire console summary from mvn-test.log
+    if not xmls:
+        log = out / "mvn-test.log"
+        if log.exists():
+            text = log.read_text(encoding="utf-8", errors="ignore")
+            # last "Tests run: N, Failures: N, Errors: N, Skipped: N"
+            matches = re.findall(
+                r"Tests run:\s*(\d+),\s*Failures:\s*(\d+),\s*Errors:\s*(\d+),\s*Skipped:\s*(\d+)",
+                text,
+            )
+            if matches:
+                t, f, e, s = map(int, matches[-1])
+                tests, fails, errors, skipped = t, f, e, s
+                rows.append(
+                    f"<tr><td>mvn-test.log (summary)</td><td>{t}</td><td>{f}</td><td>{e}</td><td>{s}</td>"
+                    f"<td><span class='sev sev-INFO'>LOG</span></td></tr>"
+                )
     body = f"""
     <div class="grid">
       <div class="card info"><div class="n">{tests}</div><div class="l">Tests</div></div>
