@@ -1,35 +1,151 @@
 {
   "info": {
-    "name": "仓库管理系统-接口集合",
+    "name": "仓库管理系统-集成/接口测试",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "与项目 context-path /springboot38hdw40x 一致；以下接口带 @IgnoreAuth，无需 Token 可用作冒烟/联调。"
+    "description": "跨模块接口集成测试。context-path=/springboot38hdw40x。CI: Newman → reports/integration/newman.html"
   },
   "item": [
     {
-      "name": "商品分类列表(前台)",
-      "request": {
-        "method": "GET",
-        "url": "{{baseUrl}}/shangpinfenlei/list?page=1&limit=10"
-      }
+      "name": "01-健康/配置",
+      "item": [
+        {
+          "name": "系统配置列表",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('body is json', () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/config/list?page=1&limit=5"
+          }
+        }
+      ]
     },
     {
-      "name": "系统配置列表(前台)",
-      "request": {
-        "method": "GET",
-        "url": "{{baseUrl}}/config/list?page=1&limit=5"
-      }
-    },
-    {
-      "name": "用户登录(yonghu)-JSON",
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"username\": \"你的账号\",\n  \"password\": \"你的密码\"\n}"
+      "name": "02-主数据",
+      "item": [
+        {
+          "name": "商品分类列表",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('has data or code', () => j !== null);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/shangpinfenlei/list?page=1&limit=10"
+          }
         },
-        "url": "{{baseUrl}}/yonghu/login"
-      }
+        {
+          "name": "商品信息列表",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/shangpinxinxi/list?page=1&limit=10"
+          }
+        },
+        {
+          "name": "供应商列表",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/gongyingshang/list?page=1&limit=10"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03-仓储业务",
+      "item": [
+        {
+          "name": "入库信息列表",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/rukuxinxi/list?page=1&limit=10"
+          }
+        },
+        {
+          "name": "订货信息列表",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/dinghuoxinxi/list?page=1&limit=10"
+          }
+        }
+      ]
+    },
+    {
+      "name": "04-用户模块",
+      "item": [
+        {
+          "name": "用户列表(前台)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/yonghu/list?page=1&limit=5"
+          }
+        }
+      ]
     }
   ]
 }

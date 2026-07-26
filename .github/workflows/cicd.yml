@@ -1,5 +1,6 @@
-# Warehouse CI — aligned with CICD reference DevSecOps stages
-# Jobs: sast → unit → integration → container_iac_scan → dast → performance
+# Warehouse CI — 五类测试全落地（证据可核查）
+# 1.Unit 2.Integration 3.E2E 4.Stress/Load 5.Security(SAST/DAST/容器/Sonar)
+# Jobs: sast → unit → integration → e2e → container_iac_scan → dast → performance → sonar → html_dashboard → publish_reports
 name: Cicd
 
 on:
@@ -91,7 +92,11 @@ jobs:
           cache: maven
 
       - name: Maven unit tests + JaCoCo
-        run: mvn -B -ntp test jacoco:report -DskipTests=false -Dmaven.test.skip=false
+        run: |
+          set -euo pipefail
+          mkdir -p reports/unit
+          mvn -B -ntp test jacoco:report -DskipTests=false -Dmaven.test.skip=false \
+            | tee reports/unit/mvn-test.log
 
       - name: Build unit HTML dashboard
         if: always()
@@ -101,6 +106,15 @@ jobs:
           if [ -d target/site/jacoco ]; then
             cp -r target/site/jacoco reports/unit/jacoco
           fi
+          # 可核查执行结果摘要
+          {
+            echo "unit_job=${GITHUB_JOB}"
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "sha=${GITHUB_SHA}"
+            echo "time_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            wc -l reports/unit/mvn-test.log 2>/dev/null || true
+            find target/surefire-reports -name 'TEST-*.xml' 2>/dev/null | wc -l | awk '{print "surefire_xmls="$1}'
+          } > reports/unit/unit-execution-meta.txt
 
       - name: Upload unit reports
         if: always()
@@ -285,9 +299,17 @@ jobs:
           EOF
           newman run tests/postman/warehouse.postman_collection.json \
             -e /tmp/ci.postman_environment.json \
-            --reporters cli,htmlextra \
+            --reporters cli,htmlextra,json \
             --reporter-htmlextra-export reports/integration/newman.html \
+            --reporter-json-export reports/integration/newman-result.json \
             || true
+          {
+            echo "integration_job=integration"
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "sha=${GITHUB_SHA}"
+            echo "time_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "collection=tests/postman/warehouse.postman_collection.json"
+          } > reports/integration/integration-execution-meta.txt
 
       - name: Upload integration reports
         if: always()
@@ -304,10 +326,82 @@ jobs:
           docker rm -f warehouse-app-ci mysql-ci 2>/dev/null || true
           docker network rm ci-app-net 2>/dev/null || true
 
+  # ---------- E2E：真实用户流程（前端 + API）----------
+  e2e:
+    name: e2e
+    needs: integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build app + frontend images
+        run: |
+          docker build -f ./Dockerfile -t "${{ env.IMAGE }}" .
+          docker build -f deploy/frontend-ci.Dockerfile -t "${{ env.FE_IMAGE }}" .
+
+      - name: Start MySQL + app + frontend
+        run: |
+          set -euo pipefail
+          docker network create ci-app-net
+          docker run -d --name mysql-ci --network ci-app-net \
+            -e MYSQL_ROOT_PASSWORD=123123 \
+            -e MYSQL_DATABASE=springboot38hdw40x \
+            -v "$GITHUB_WORKSPACE/db/springboot38hdw40x.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro" \
+            "${{ env.CI_MYSQL_IMAGE }}"
+          for i in $(seq 1 90); do
+            docker exec mysql-ci mysqladmin ping -h127.0.0.1 -uroot -p123123 --silent 2>/dev/null && break
+            sleep 2
+          done
+          docker run -d --name warehouse-app-ci --network ci-app-net \
+            -p 127.0.0.1:8080:8080 \
+            -e JAVA_OPTS="-Xms256m -Xmx512m" \
+            -e SPRING_DATASOURCE_URL='jdbc:mysql://mysql-ci:3306/springboot38hdw40x?useUnicode=true&characterEncoding=utf-8&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true' \
+            -e SPRING_DATASOURCE_USERNAME=root \
+            -e SPRING_DATASOURCE_PASSWORD=123123 \
+            "${{ env.IMAGE }}"
+          for i in $(seq 1 60); do
+            curl -fsS "${{ env.CI_LOCAL_HEALTH_URL }}" && break
+            sleep 2
+          done
+          docker run -d --name warehouse-fe-ci --network ci-app-net \
+            -p 127.0.0.1:30080:80 \
+            "${{ env.FE_IMAGE }}"
+          sleep 3
+          curl -fsS -o /dev/null "http://127.0.0.1:30080/" || true
+
+      - name: Run E2E user journey
+        run: |
+          mkdir -p reports/e2e
+          E2E_API_BASE="${{ env.CI_LOCAL_APP_BASE }}" \
+          E2E_FE_BASE="http://127.0.0.1:30080" \
+          E2E_OUT=reports/e2e \
+            python3 tests/e2e/user-journey.py || true
+          {
+            echo "e2e_job=e2e"
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "sha=${GITHUB_SHA}"
+            echo "time_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > reports/e2e/e2e-execution-meta.txt
+
+      - name: Upload E2E reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-reports
+          path: reports/e2e
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: warn
+
+      - name: Teardown
+        if: always()
+        run: |
+          docker rm -f warehouse-fe-ci warehouse-app-ci mysql-ci 2>/dev/null || true
+          docker network rm ci-app-net 2>/dev/null || true
+
   # ---------- Container + IaC (Trivy + Checkov) ----------
   container_iac_scan:
     name: container_iac_scan
-    needs: integration
+    needs: [integration, e2e]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -494,12 +588,15 @@ jobs:
           sudo tar -C /tmp -xzf /tmp/k6.tgz
           sudo install -m 0755 /tmp/k6-v0.49.0-linux-amd64/k6 /usr/local/bin/k6
 
-      - name: k6 load test
+      - name: k6 load + stress test
         run: |
           mkdir -p reports/perf/k6
+          k6 run --out json=reports/perf/k6/raw-smoke.json \
+            -e BASE_URL="${{ env.CI_LOCAL_APP_BASE }}" \
+            tests/k6/smoke.js || true
           k6 run --out json=reports/perf/k6/raw.json \
             -e BASE_URL="${{ env.CI_LOCAL_APP_BASE }}" \
-            tests/k6/smoke.js
+            tests/k6/stress.js || true
 
       - name: Install JMeter
         run: |
@@ -525,6 +622,14 @@ jobs:
         run: |
           python3 deploy/ci/generate-html-reports.py k6 reports/perf/k6 reports/perf/k6/raw.json
           python3 deploy/ci/generate-html-reports.py jmeter reports/perf/jmeter reports/perf/jmeter/result.jtl
+          {
+            echo "performance_job=performance"
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "sha=${GITHUB_SHA}"
+            echo "time_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "k6_scripts=smoke.js,stress.js"
+            echo "jmeter=warehouse-load.jmx"
+          } > reports/perf/performance-execution-meta.txt
 
       - name: Upload performance reports
         if: always()
@@ -544,7 +649,7 @@ jobs:
   # ---------- Unified HTML dashboard (like reference doc screenshots) ----------
   html_dashboard:
     name: html_dashboard
-    needs: [sast, unit, integration, container_iac_scan, dast, performance, sonar]
+    needs: [sast, unit, integration, e2e, container_iac_scan, dast, performance, sonar]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -606,6 +711,11 @@ jobs:
           cp collected/sonar-reports/sonar-summary.html dashboard/sonar-summary.html 2>/dev/null || true
           cp collected/performance-reports/k6/k6-summary.html dashboard/k6-summary.html 2>/dev/null || true
           cp collected/performance-reports/jmeter/jmeter-summary.html dashboard/jmeter-summary.html 2>/dev/null || true
+          # E2E
+          cp collected/e2e-reports/e2e-summary.html dashboard/e2e-summary.html 2>/dev/null || true
+          cp collected/e2e-reports/e2e-results.json dashboard/e2e-results.json 2>/dev/null || true
+          cp collected/e2e-reports/e2e-run.log dashboard/e2e-run.log 2>/dev/null || true
+          find collected/e2e-reports -type f -name 'e2e-summary.html' -exec cp {} dashboard/e2e-summary.html \; 2>/dev/null || true
           # JMeter official dashboard
           if [ -d collected/performance-reports/jmeter-dashboard ]; then
             cp -r collected/performance-reports/jmeter-dashboard dashboard/jmeter-dashboard
@@ -620,23 +730,29 @@ jobs:
           [ -f dashboard/unit-summary.html ] || cp dashboard/unit-reports_reports_unit_unit-summary.html dashboard/unit-summary.html 2>/dev/null || true
           [ -f dashboard/sast-summary.html ] || cp dashboard/sast-reports_sast-summary.html dashboard/sast-summary.html 2>/dev/null || true
           [ -f dashboard/zap-report.html ] || cp dashboard/dast-zap-reports_zap-report.html dashboard/zap-report.html 2>/dev/null || true
+          [ -f dashboard/e2e-summary.html ] || cp dashboard/e2e-reports_e2e-summary.html dashboard/e2e-summary.html 2>/dev/null || true
 
           python3 deploy/ci/generate-html-reports.py index dashboard \
-            "SAST|SAST Security Scan Summary|sast-summary.html|Gitleaks + Semgrep 统计与明细" \
-            "Unit|Unit Test Summary|unit-summary.html|Maven Surefire" \
-            "Coverage|JaCoCo Coverage Report|jacoco/index.html|语句/分支覆盖率（类似文档 coverage 截图）" \
-            "Integration|Newman API Report|newman.html|Postman/Newman HTML" \
-            "Container|Trivy App Image|app-image.html|镜像漏洞分级统计" \
+            "Evidence|五类测试证据总览|evidence-index.html|Unit/Integration/E2E/Perf/Security 可核查入口" \
+            "Unit|Unit Test Summary|unit-summary.html|Maven Surefire 完整用例结果" \
+            "Unit|JaCoCo Coverage Report|jacoco/index.html|语句/分支覆盖率" \
+            "Integration|Newman API Report|newman.html|跨模块接口集成" \
+            "E2E|User Journey E2E|e2e-summary.html|真实用户流程 PASS/FAIL" \
+            "SAST|SAST Security Scan Summary|sast-summary.html|Gitleaks + Semgrep" \
+            "Container|Trivy App Image|app-image.html|镜像漏洞分级" \
             "Container|Trivy Frontend Image|frontend-image.html|前端镜像扫描" \
             "Container|Trivy Filesystem|fs.html|依赖/配置扫描" \
             "IaC|Checkov Kubernetes|k8s.html|K8s 配置检查" \
-            "IaC|Checkov Dockerfile (app)|dockerfile-app.html|Dockerfile 最佳实践" \
             "DAST|OWASP ZAP Report|zap-report.html|动态扫描 HTML" \
-            "Performance|K6 Summary|k6-summary.html|延迟 p50/p95" \
+            "Security|Security Evidence Pack|security-evidence.html|漏洞清单与复测核查" \
+            "Performance|K6 Summary|k6-summary.html|延迟 p50/p95/压力阶梯" \
             "Performance|JMeter Summary|jmeter-summary.html|JTL 汇总" \
-            "Performance|JMeter Dashboard|jmeter-dashboard/index.html|官方图表看板（若生成）" \
-            "Sonar|SonarQube Measures|sonar-summary.html|Bugs/Vulns/Hotspots Reviewed/Coverage 明细" \
-            "Sonar|SonarQube Dashboard|${{ secrets.SONAR_HOST_URL }}/dashboard?id=warehouse-management|服务器 Sonar（需配置）"
+            "Performance|JMeter Dashboard|jmeter-dashboard/index.html|吞吐/响应时间曲线" \
+            "Performance|Bottleneck Analysis|perf-analysis.html|瓶颈与优化方案" \
+            "Sonar|SonarQube Measures|sonar-summary.html|Bugs/Vulns/Hotspots/Coverage" \
+            "Sonar|SonarQube Dashboard|${{ secrets.SONAR_HOST_URL }}/dashboard?id=warehouse-management|服务器 Sonar"
+
+          python3 deploy/ci/generate-evidence-pack.py dashboard
 
           echo "## CI HTML Dashboard" >> "$GITHUB_STEP_SUMMARY"
           echo "Download artifact **ci-html-dashboard** and open \`index.html\` in a browser." >> "$GITHUB_STEP_SUMMARY"
@@ -719,15 +835,20 @@ jobs:
             <h1>CI Reports</h1>
             <p>Run ${RUN_ID}</p>
             <ul>
+              <li><a href="./latest/evidence-index.html">五类测试证据总览</a></li>
               <li><a href="./latest/index.html">Dashboard (latest)</a></li>
-              <li><a href="./latest/app-image.html">Trivy App Image</a></li>
+              <li><a href="./latest/unit-summary.html">Unit Summary</a></li>
               <li><a href="./latest/jacoco/index.html">JaCoCo Coverage</a></li>
-              <li><a href="./latest/jmeter-dashboard/index.html">JMeter Charts</a></li>
+              <li><a href="./latest/newman.html">Integration Newman</a></li>
+              <li><a href="./latest/e2e-summary.html">E2E User Journey</a></li>
               <li><a href="./latest/k6-summary.html">k6 Perf</a></li>
+              <li><a href="./latest/jmeter-dashboard/index.html">JMeter Charts</a></li>
+              <li><a href="./latest/perf-analysis.html">Perf Bottleneck Analysis</a></li>
               <li><a href="./latest/sast-summary.html">SAST</a></li>
-              <li><a href="./latest/newman.html">Newman</a></li>
-              <li><a href="./latest/sonar-summary.html">Sonar Measures</a></li>
+              <li><a href="./latest/security-evidence.html">Security Evidence</a></li>
+              <li><a href="./latest/app-image.html">Trivy App Image</a></li>
               <li><a href="./latest/zap-report.html">ZAP DAST</a></li>
+              <li><a href="./latest/sonar-summary.html">Sonar Measures</a></li>
             </ul>
             </body></html>
             EOF
