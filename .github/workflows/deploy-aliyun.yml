@@ -88,7 +88,7 @@ jobs:
             sed -i 's/\r$//' "$DP"/k8s/*.sh || true
             chmod +x "$DP"/k8s/*.sh
             test -f "$DP/Dockerfile" && test -f "$DP/k8s/apply-stack.sh"
-            echo "== sync ok â†’ ${DP}"
+            echo "== sync ok â†?${DP}"
 
   build:
     name: build
@@ -122,7 +122,7 @@ jobs:
             FE_IMAGE="${HH}/${HP}/warehouse-frontend:${TAG}"
             cd "$DP"
             docker build -t "${IMAGE}" -t "${HH}/${HP}/warehouse-app:latest" -f ./Dockerfile .
-            docker build -t "${FE_IMAGE}" -t "${HH}/${HP}/warehouse-frontend:latest" -f deploy/frontend-ci.Dockerfile .
+            docker build -t "${FE_IMAGE}" -t "${HH}/${HP}/warehouse-frontend:latest" -f Dockerfile.frontend .
             echo "${IMAGE}" > /tmp/warehouse-app.image
             echo "${FE_IMAGE}" > /tmp/warehouse-frontend.image
             echo "${TAG}" > /tmp/warehouse-image.tag
@@ -205,7 +205,7 @@ jobs:
               --docker-password="${HPW}" \
               --dry-run=client -o yaml | kubectl apply -f -
             if kubectl -n "${NS}" get deploy mysql >/dev/null 2>&1; then
-              echo "== mysql already present â€” leaving untouched"
+              echo "== mysql already present â€?leaving untouched"
               kubectl -n "${NS}" get deploy,pods -l app=mysql -o wide || true
             else
               echo "::warning::mysql deployment not found in ${NS}; app will need an existing DB endpoint"
@@ -217,7 +217,7 @@ jobs:
     needs: prepare-k8s
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy Java + frontend only (Harbor â†’ k8s)
+      - name: Deploy Java + frontend only (Harbor â†?k8s)
         uses: appleboy/ssh-action@v1.2.1
         env:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}

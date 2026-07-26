@@ -37,12 +37,12 @@ node_modules/
 ### Env / secrets ###
 .env
 .env.docker
-deploy/.secrets/
-deploy/tmp-*.py
+
+### Local deploy / ops (do not publish to GitHub) ###
+deploy/
 
 ### Docs (do not publish to GitHub) ###
 docs/
 *.md
 !src/main/resources/db/migration/README.md
-deploy/**/*.md
 

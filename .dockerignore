@@ -9,7 +9,6 @@ target
 .git
 .gitignore
 *.md
-!deploy/DOCKER.md
 agent-transcripts
 .cursor
 tests

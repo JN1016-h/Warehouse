@@ -64,7 +64,7 @@ jobs:
 
       - name: Build SAST HTML dashboard
         if: always()
-        run: python3 deploy/ci/generate-html-reports.py sast reports/sast reports/sast
+        run: python3 ci/generate-html-reports.py sast reports/sast reports/sast
 
       - name: Upload SAST reports
         if: always()
@@ -111,7 +111,7 @@ jobs:
           find target -name 'TEST-*.xml' -print -exec cp -f {} reports/unit/surefire/ \; 2>/dev/null || true
           echo "== surefire files"
           ls -la reports/unit/surefire | head -n 40 || true
-          python3 deploy/ci/generate-html-reports.py unit reports/unit reports/unit/surefire
+          python3 ci/generate-html-reports.py unit reports/unit reports/unit/surefire
           if [ -d target/site/jacoco ]; then
             cp -r target/site/jacoco reports/unit/jacoco
           fi
@@ -127,7 +127,7 @@ jobs:
           # sanity: summary must not stay at zero when XML exists
           grep -q 'No surefire XML found' reports/unit/unit-summary.html && \
             ls reports/unit/surefire/TEST-*.xml >/dev/null 2>&1 && \
-            echo "::warning::surefire XML present but summary empty — check parser" || true
+            echo "::warning::surefire XML present but summary empty �?check parser" || true
 
       - name: Upload unit reports
         if: always()
@@ -224,7 +224,7 @@ jobs:
           SONAR_REPORT_DIR: reports/sonar
         run: |
           set -euo pipefail
-          python3 deploy/ci/sonar-enrich.py
+          python3 ci/sonar-enrich.py
           echo "## SonarQube metrics" >> "$GITHUB_STEP_SUMMARY"
           if [ -f reports/sonar/measures.json ]; then
             python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
@@ -363,7 +363,7 @@ jobs:
       - name: Docker build (app + frontend)
         run: |
           docker build -f ./Dockerfile -t "${{ env.IMAGE }}" .
-          docker build -f deploy/frontend-ci.Dockerfile -t "${{ env.FE_IMAGE }}" .
+          docker build -f Dockerfile.frontend -t "${{ env.FE_IMAGE }}" .
 
       - name: Install Trivy
         run: |
@@ -400,19 +400,19 @@ jobs:
           mkdir -p reports/checkov
           checkov -d k8s --framework kubernetes --compact -o json > reports/checkov/k8s.json || true
           checkov -f Dockerfile --framework dockerfile --compact -o json > reports/checkov/dockerfile-app.json || true
-          checkov -f deploy/frontend-ci.Dockerfile --framework dockerfile --compact -o json > reports/checkov/dockerfile-frontend.json || true
+          checkov -f Dockerfile.frontend --framework dockerfile --compact -o json > reports/checkov/dockerfile-frontend.json || true
           checkov -d k8s --framework kubernetes --compact || true
 
       - name: Build Trivy/Checkov HTML dashboards
         if: always()
         run: |
           mkdir -p reports/html
-          python3 deploy/ci/generate-html-reports.py trivy reports/html reports/trivy/fs.json "Trivy Filesystem Scan"
-          python3 deploy/ci/generate-html-reports.py trivy reports/html reports/trivy/app-image.json "Trivy App Image Scan"
-          python3 deploy/ci/generate-html-reports.py trivy reports/html reports/trivy/frontend-image.json "Trivy Frontend Image Scan"
-          python3 deploy/ci/generate-html-reports.py checkov reports/html reports/checkov/k8s.json "Checkov Kubernetes"
-          python3 deploy/ci/generate-html-reports.py checkov reports/html reports/checkov/dockerfile-app.json "Checkov Dockerfile (app)"
-          python3 deploy/ci/generate-html-reports.py checkov reports/html reports/checkov/dockerfile-frontend.json "Checkov Dockerfile (frontend)"
+          python3 ci/generate-html-reports.py trivy reports/html reports/trivy/fs.json "Trivy Filesystem Scan"
+          python3 ci/generate-html-reports.py trivy reports/html reports/trivy/app-image.json "Trivy App Image Scan"
+          python3 ci/generate-html-reports.py trivy reports/html reports/trivy/frontend-image.json "Trivy Frontend Image Scan"
+          python3 ci/generate-html-reports.py checkov reports/html reports/checkov/k8s.json "Checkov Kubernetes"
+          python3 ci/generate-html-reports.py checkov reports/html reports/checkov/dockerfile-app.json "Checkov Dockerfile (app)"
+          python3 ci/generate-html-reports.py checkov reports/html reports/checkov/dockerfile-frontend.json "Checkov Dockerfile (frontend)"
           cp -r reports/html/* reports/trivy/ 2>/dev/null || true
           cp reports/html/*.html reports/checkov/ 2>/dev/null || true
 
@@ -518,8 +518,8 @@ jobs:
       - name: Build k6 / JMeter HTML summaries
         if: always()
         run: |
-          python3 deploy/ci/generate-html-reports.py k6 reports/perf/k6 reports/perf/k6/raw.json
-          python3 deploy/ci/generate-html-reports.py jmeter reports/perf/jmeter reports/perf/jmeter/result.jtl
+          python3 ci/generate-html-reports.py k6 reports/perf/k6 reports/perf/k6/raw.json
+          python3 ci/generate-html-reports.py jmeter reports/perf/jmeter reports/perf/jmeter/result.jtl
           {
             echo "performance_job=performance"
             echo "run_id=${GITHUB_RUN_ID}"
@@ -612,27 +612,27 @@ jobs:
           [ -f dashboard/zap-report.html ] || cp dashboard/dast-zap-reports_zap-report.html dashboard/zap-report.html 2>/dev/null || true
           [ -f dashboard/e2e-summary.html ] || cp dashboard/e2e-reports_e2e-summary.html dashboard/e2e-summary.html 2>/dev/null || true
 
-          python3 deploy/ci/generate-html-reports.py index dashboard \
-            "Evidence|五类测试证据总览|evidence-index.html|Unit/Integration/E2E/Perf/Security 可核查入口" \
+          python3 ci/generate-html-reports.py index dashboard \
+            "Evidence|五类测试证据总览|evidence-index.html|Unit/Integration/E2E/Perf/Security 可核查入�? \
             "Unit|Unit Test Summary|unit-summary.html|Maven Surefire 完整用例结果" \
-            "Unit|JaCoCo Coverage Report|jacoco/index.html|语句/分支覆盖率" \
-            "Integration|Newman API Report|newman.html|跨模块接口集成" \
+            "Unit|JaCoCo Coverage Report|jacoco/index.html|语句/分支覆盖�? \
+            "Integration|Newman API Report|newman.html|跨模块接口集�? \
             "E2E|User Journey E2E|e2e-summary.html|真实用户流程 PASS/FAIL" \
             "SAST|SAST Security Scan Summary|sast-summary.html|Gitleaks + Semgrep" \
             "Container|Trivy App Image|app-image.html|镜像漏洞分级" \
             "Container|Trivy Frontend Image|frontend-image.html|前端镜像扫描" \
             "Container|Trivy Filesystem|fs.html|依赖/配置扫描" \
-            "IaC|Checkov Kubernetes|k8s.html|K8s 配置检查" \
-            "DAST|OWASP ZAP Report|zap-report.html|动态扫描 HTML" \
-            "Security|Security Evidence Pack|security-evidence.html|漏洞清单与复测核查" \
+            "IaC|Checkov Kubernetes|k8s.html|K8s 配置检�? \
+            "DAST|OWASP ZAP Report|zap-report.html|动态扫�?HTML" \
+            "Security|Security Evidence Pack|security-evidence.html|漏洞清单与复测核�? \
             "Performance|K6 Summary|k6-summary.html|延迟 p50/p95/压力阶梯" \
-            "Performance|JMeter Summary|jmeter-summary.html|JTL 汇总" \
+            "Performance|JMeter Summary|jmeter-summary.html|JTL 汇�? \
             "Performance|JMeter Dashboard|jmeter-dashboard/index.html|吞吐/响应时间曲线" \
-            "Performance|Bottleneck Analysis|perf-analysis.html|瓶颈与优化方案" \
+            "Performance|Bottleneck Analysis|perf-analysis.html|瓶颈与优化方�? \
             "Sonar|SonarQube Measures|sonar-summary.html|Bugs/Vulns/Hotspots/Coverage" \
-            "Sonar|SonarQube Dashboard|${{ secrets.SONAR_HOST_URL }}/dashboard?id=warehouse-management|服务器 Sonar"
+            "Sonar|SonarQube Dashboard|${{ secrets.SONAR_HOST_URL }}/dashboard?id=warehouse-management|服务�?Sonar"
 
-          python3 deploy/ci/generate-evidence-pack.py dashboard
+          python3 ci/generate-evidence-pack.py dashboard
 
           echo "## CI HTML Dashboard" >> "$GITHUB_STEP_SUMMARY"
           echo "Download artifact **ci-html-dashboard** and open \`index.html\` in a browser." >> "$GITHUB_STEP_SUMMARY"
