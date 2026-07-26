@@ -42,35 +42,31 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
-      - name: Write SSH private key
+      - name: Check SSH key secret
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
         run: |
-          f="$GITHUB_WORKSPACE/.ssh_deploy_key"
-          umask 077
-          echo "$SSH_PRIVATE_KEY" > "$f"
-          bytes=$(wc -c < "$f" | tr -d ' ')
-          if [ "${bytes:-0}" -lt 80 ]; then
+          set -euo pipefail
+          if [ -z "${SSH_PRIVATE_KEY:-}" ] || [ "${#SSH_PRIVATE_KEY}" -lt 80 ]; then
             echo "::error::Set secret ALIYUN_SSH_KEY"
             exit 1
           fi
-          if ! grep -qE 'BEGIN (OPENSSH|RSA|EC) PRIVATE KEY' "$f"; then
-            echo "::error::ALIYUN_SSH_KEY must be a PRIVATE key PEM."
-            exit 1
-          fi
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
+          printf '%s\n' "$SSH_PRIVATE_KEY" | grep -qE 'BEGIN (OPENSSH|RSA|EC) PRIVATE KEY' \
+            || { echo "::error::ALIYUN_SSH_KEY must be a PRIVATE key PEM."; exit 1; }
 
       - name: Pack source
         run: |
           tar --exclude='./.git' --exclude='**/node_modules' --exclude='./target' \
-              --exclude='./.ssh_deploy_key' -czf /tmp/warehouse-src.tgz .
+              -czf /tmp/warehouse-src.tgz .
           ls -lh /tmp/warehouse-src.tgz
 
+      # Prefer `key` over key_path — Dockerized appleboy cannot always read workspace 0600 files
       - name: Upload tarball
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
-          key_path: ${{ github.workspace }}/.ssh_deploy_key
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
           source: "/tmp/warehouse-src.tgz"
@@ -84,7 +80,7 @@ jobs:
         with:
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
-          key_path: ${{ github.workspace }}/.ssh_deploy_key
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
           command_timeout: 10m
@@ -99,22 +95,11 @@ jobs:
             test -f "$DP/Dockerfile" && test -f "$DP/k8s/apply-stack.sh"
             echo "== sync ok → ${DP}"
 
-      - name: Remove SSH key
-        if: always()
-        run: rm -f "$GITHUB_WORKSPACE/.ssh_deploy_key"
-
   build:
     name: build
     needs: sync
     runs-on: ubuntu-latest
     steps:
-      - name: Write SSH private key
-        run: |
-          umask 077
-          echo "$SSH_PRIVATE_KEY" > "$GITHUB_WORKSPACE/.ssh_deploy_key"
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
-
       - name: Build images tagged for Harbor
         uses: appleboy/ssh-action@v1.2.1
         env:
@@ -126,7 +111,7 @@ jobs:
         with:
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
-          key_path: ${{ github.workspace }}/.ssh_deploy_key
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
           command_timeout: 60m
@@ -146,22 +131,11 @@ jobs:
             echo "${FE_IMAGE}" > /tmp/warehouse-frontend.image
             echo "== BUILD ok ${IMAGE} ${FE_IMAGE}"
 
-      - name: Remove SSH key
-        if: always()
-        run: rm -f "$GITHUB_WORKSPACE/.ssh_deploy_key"
-
   push-harbor:
     name: push-harbor
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Write SSH private key
-        run: |
-          umask 077
-          echo "$SSH_PRIVATE_KEY" > "$GITHUB_WORKSPACE/.ssh_deploy_key"
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
-
       - name: Push to Harbor
         uses: appleboy/ssh-action@v1.2.1
         env:
@@ -173,7 +147,7 @@ jobs:
         with:
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
-          key_path: ${{ github.workspace }}/.ssh_deploy_key
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
           command_timeout: 30m
@@ -196,22 +170,11 @@ jobs:
             docker push "${FE_IMAGE}"
             echo "== pushed ${IMAGE} ${FE_IMAGE}"
 
-      - name: Remove SSH key
-        if: always()
-        run: rm -f "$GITHUB_WORKSPACE/.ssh_deploy_key"
-
   prepare-k8s:
     name: prepare-k8s
     needs: push-harbor
     runs-on: ubuntu-latest
     steps:
-      - name: Write SSH private key
-        run: |
-          umask 077
-          echo "$SSH_PRIVATE_KEY" > "$GITHUB_WORKSPACE/.ssh_deploy_key"
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
-
       - name: Namespace + Harbor pull secret only (skip MySQL)
         uses: appleboy/ssh-action@v1.2.1
         env:
@@ -224,7 +187,7 @@ jobs:
         with:
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
-          key_path: ${{ github.workspace }}/.ssh_deploy_key
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
           command_timeout: 10m
@@ -252,22 +215,11 @@ jobs:
             fi
             echo "== prepare-k8s ok (MySQL skipped)"
 
-      - name: Remove SSH key
-        if: always()
-        run: rm -f "$GITHUB_WORKSPACE/.ssh_deploy_key"
-
   deploy-services:
     name: deploy-services
     needs: prepare-k8s
     runs-on: ubuntu-latest
     steps:
-      - name: Write SSH private key
-        run: |
-          umask 077
-          echo "$SSH_PRIVATE_KEY" > "$GITHUB_WORKSPACE/.ssh_deploy_key"
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
-
       - name: Deploy Java + frontend only (Harbor → k8s)
         uses: appleboy/ssh-action@v1.2.1
         env:
@@ -280,7 +232,7 @@ jobs:
         with:
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
-          key_path: ${{ github.workspace }}/.ssh_deploy_key
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
           command_timeout: 30m
@@ -317,22 +269,11 @@ jobs:
             kubectl get deploy -n "${NS}" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.template.spec.containers[0].image}{"\n"}{end}'
             echo "== deployed app=${IMAGE} fe=${FE_IMAGE} (mysql untouched)"
 
-      - name: Remove SSH key
-        if: always()
-        run: rm -f "$GITHUB_WORKSPACE/.ssh_deploy_key"
-
   deploy-gateway:
     name: deploy-gateway
     needs: deploy-services
     runs-on: ubuntu-latest
     steps:
-      - name: Write SSH private key
-        run: |
-          umask 077
-          echo "$SSH_PRIVATE_KEY" > "$GITHUB_WORKSPACE/.ssh_deploy_key"
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
-
       - name: Ingress optional
         uses: appleboy/ssh-action@v1.2.1
         env:
@@ -342,7 +283,7 @@ jobs:
         with:
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
-          key_path: ${{ github.workspace }}/.ssh_deploy_key
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
           command_timeout: 10m
@@ -355,22 +296,11 @@ jobs:
             [ -f "${KD}/ingress.yaml" ] && kubectl apply -f "${KD}/ingress.yaml" || true
             echo "== FE:30080 API:30081 Harbor:80"
 
-      - name: Remove SSH key
-        if: always()
-        run: rm -f "$GITHUB_WORKSPACE/.ssh_deploy_key"
-
   verify:
     name: verify
     needs: deploy-gateway
     runs-on: ubuntu-latest
     steps:
-      - name: Write SSH private key
-        run: |
-          umask 077
-          echo "$SSH_PRIVATE_KEY" > "$GITHUB_WORKSPACE/.ssh_deploy_key"
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
-
       - name: Verify
         uses: appleboy/ssh-action@v1.2.1
         env:
@@ -379,7 +309,7 @@ jobs:
         with:
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
-          key_path: ${{ github.workspace }}/.ssh_deploy_key
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
           command_timeout: 10m
@@ -402,7 +332,3 @@ jobs:
           - API: http://121.40.253.17:30081/springboot38hdw40x/
           - MySQL: left as-is (not applied / not restarted)
           EOF
-
-      - name: Remove SSH key
-        if: always()
-        run: rm -f "$GITHUB_WORKSPACE/.ssh_deploy_key"

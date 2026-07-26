@@ -626,25 +626,20 @@ jobs:
     if: ${{ always() && vars.REPORTS_SYNC_ENABLED == 'true' && needs.html_dashboard.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Write SSH key
-        run: |
-          umask 077
-          echo "$SSH_PRIVATE_KEY" > "$GITHUB_WORKSPACE/.ssh_deploy_key"
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
-
       - name: Download dashboard
         uses: actions/download-artifact@v4
         with:
           name: ci-html-dashboard
           path: dashboard
 
+      # Use `key` (not key_path): scp-action runs in Docker and often cannot read
+      # workspace files written as mode 0600 → "getKeyFile ... permission denied"
       - name: Sync reports to server nginx volume
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
-          key_path: ${{ github.workspace }}/.ssh_deploy_key
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
           source: "dashboard"
@@ -660,7 +655,7 @@ jobs:
         with:
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
-          key_path: ${{ github.workspace }}/.ssh_deploy_key
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
           envs: RUN_ID,REPORTS_REMOTE_DIR,REPORTS_HTTP_PORT
@@ -703,7 +698,3 @@ jobs:
             echo "URL: http://<host>:${REPORTS_HTTP_PORT}/reports/latest/index.html"
             find "${RD}/latest" -maxdepth 2 -type f -name '*.html' > /tmp/ci-reports-html-list.txt || true
             head -n 30 /tmp/ci-reports-html-list.txt || true
-
-      - name: Remove SSH key
-        if: always()
-        run: rm -f "$GITHUB_WORKSPACE/.ssh_deploy_key"
