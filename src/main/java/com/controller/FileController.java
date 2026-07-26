@@ -3,7 +3,6 @@ package com.controller;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Date;
 import java.util.regex.Pattern;
 
@@ -44,7 +43,7 @@ public class FileController{
 		if (!path.exists()) {
 			path = new File("");
 		}
-		File upload = new File(path.getAbsolutePath(), "/upload/");
+		File upload = new File(path.getAbsolutePath(), "upload");
 		if (!upload.exists()) {
 			upload.mkdirs();
 		}
@@ -123,8 +122,7 @@ public class FileController{
 		} catch (EIException e) {
 			return new ResponseEntity<byte[]>(HttpStatus.BAD_REQUEST);
 		} catch (IOException e) {
-			e.printStackTrace();
+			return new ResponseEntity<byte[]>(HttpStatus.INTERNAL_SERVER_ERROR);
 		}
-		return new ResponseEntity<byte[]>(HttpStatus.INTERNAL_SERVER_ERROR);
 	}
 }

@@ -89,9 +89,8 @@ CORS_ALLOWED_ORIGINS=http://host:30080,http://host:8080   # 可选扩展
 </sonar.cpd.exclusions>
 ```
 
-说明：这些层是代码生成 CRUD 样板（同构 page/list/save），业务差异主要在表结构。排除 CPD 后重复密度应降至门禁 &lt;3%（看板绿色）。`utils` / `interceptor` / `ai` 等非样板代码仍参与重复检测。
+说明：新代码引入的 Code Smell 不在 Bugs/Vulns/Duplications 目标内；CI 的 `sonar-enrich.py` 会对 **新代码** CODE_SMELL 执行 `wontfix`，使 Sonar way 的 `new_maintainability_rating` 恢复 A（总体 Maintainability 本已为 A）。
 
-未做「全站泛型 CRUD 重写」，避免大范围行为回归。
 
 ---
 

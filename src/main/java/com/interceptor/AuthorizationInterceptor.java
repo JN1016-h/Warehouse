@@ -1,9 +1,7 @@
 package com.interceptor;
 
-import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.HashMap;
-import java.util.Map;
+
 import com.alibaba.fastjson.JSONObject;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -17,7 +15,6 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.http.HttpStatus;
 
 import com.annotation.IgnoreAuth;
-import com.entity.EIException;
 import com.entity.TokenEntity;
 import com.service.TokenService;
 import com.utils.R;
@@ -59,7 +56,7 @@ public class AuthorizationInterceptor implements HandlerInterceptor {
         response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
         response.setHeader("Pragma", "no-cache");
 	// 跨域时会首先发送一个OPTIONS请求，这里我们给OPTIONS请求直接返回正常状态
-	if (request.getMethod().equals(RequestMethod.OPTIONS.name())) {
+	if (RequestMethod.OPTIONS.name().equals(request.getMethod())) {
         	response.setStatus(HttpStatus.OK.value());
             return false;
         }

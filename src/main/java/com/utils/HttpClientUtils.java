@@ -40,8 +40,7 @@ public class HttpClientUtils {
                 }
             }
             return res.toString();
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (IOException e) {
             return null;
         } finally {
             if (conn != null) {
@@ -66,8 +65,8 @@ public class HttpClientUtils {
                     resultString = EntityUtils.toString(response.getEntity(), "utf-8");
                 }
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (IOException e) {
+            return resultString;
         }
         return resultString;
     }

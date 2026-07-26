@@ -41,14 +41,22 @@ public class BaiduUtil {
                 return null;
             }
             JSONObject o = new JSONObject(result);
+            if (!o.has("result")) {
+                return null;
+            }
+            JSONObject resultObj = o.getJSONObject("result");
+            if (!resultObj.has("addressComponent")) {
+                return null;
+            }
+            JSONObject ac = resultObj.getJSONObject("addressComponent");
             Map<String, String> area = new HashMap<>();
-			area.put("province", o.getJSONObject("result").getJSONObject("addressComponent").getString("province"));
-			area.put("city", o.getJSONObject("result").getJSONObject("addressComponent").getString("city"));
-			area.put("district", o.getJSONObject("result").getJSONObject("addressComponent").getString("district"));
-			area.put("street", o.getJSONObject("result").getJSONObject("addressComponent").getString("street"));
+			area.put("province", ac.optString("province"));
+			area.put("city", ac.optString("city"));
+			area.put("district", ac.optString("district"));
+			area.put("street", ac.optString("street"));
             return area;
         }catch (Exception e) {
-            e.printStackTrace();
+            // ignore malformed / network failures
         }
         return null;
     }
@@ -87,8 +95,7 @@ public class BaiduUtil {
             org.json.JSONObject jsonObject = new org.json.JSONObject(result.toString());
             return jsonObject.getString("access_token");
         } catch (Exception e) {
-            System.err.printf("获取token失败！");
-            e.printStackTrace(System.err);
+            System.err.printf("获取token失败！%n");
         }
         return null;
     }
@@ -131,9 +138,8 @@ public class BaiduUtil {
             String result = mergeString(jsonObject, isNewline);
             return result;
         }catch(Exception ex){
-            ex.printStackTrace();
+            return null;
         }
-        return null;
     }
 
 

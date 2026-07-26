@@ -1,10 +1,12 @@
 package com.utils;
 
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.ProviderException;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
 import java.util.Base64;
@@ -155,7 +157,7 @@ public class EncryptUtil {
             cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, gcm);
             byte[] encryptedData = cipher.doFinal(text.getBytes(StandardCharsets.UTF_8));
             return Base64.getEncoder().encodeToString(encryptedData);
-        } catch (Exception e) {
+        } catch (GeneralSecurityException | IllegalArgumentException | IllegalStateException | ProviderException e) {
             return null;
         }
     }
@@ -172,7 +174,7 @@ public class EncryptUtil {
             byte[] decodedData = Base64.getDecoder().decode(text);
             byte[] decryptedData = cipher.doFinal(decodedData);
             return new String(decryptedData, StandardCharsets.UTF_8);
-        } catch (Exception e) {
+        } catch (GeneralSecurityException | IllegalArgumentException | IllegalStateException | ProviderException e) {
             return null;
         }
     }

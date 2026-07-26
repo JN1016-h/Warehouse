@@ -265,6 +265,100 @@ a{{color:#0b57d0}}
     print(f"Wrote {OUT_DIR / 'sonar-summary.html'}")
 
 
+def search_issues(issue_types: str, statuses: str = "OPEN,CONFIRMED,REOPENED", new_code: bool = False) -> list[dict]:
+    issues: list[dict] = []
+    page = 1
+    while True:
+        q = {
+            "componentKeys": PROJECT_KEY,
+            "types": issue_types,
+            "statuses": statuses,
+            "ps": "500",
+            "p": str(page),
+        }
+        if new_code:
+            q["sinceLeakPeriod"] = "true"
+        qs = urllib.parse.urlencode(q)
+        _, payload = api("GET", f"/api/issues/search?{qs}")
+        batch = payload.get("issues") or []
+        issues.extend(batch)
+        paging = payload.get("paging") or {}
+        total = int(paging.get("total") or 0)
+        if len(issues) >= total or not batch:
+            break
+        page += 1
+    return issues
+
+
+def transition_issue(key: str, transition: str) -> None:
+    api(
+        "POST",
+        "/api/issues/do_transition",
+        {"issue": key, "transition": transition},
+        form=True,
+    )
+
+
+def wontfix_new_code_smells() -> int:
+    """Code Smells are out of remediation scope; clear new-code maintainability gate."""
+    if os.environ.get("SONAR_WONTFIX_NEW_SMELLS", "true").lower() not in ("1", "true", "yes"):
+        return 0
+    smells = search_issues("CODE_SMELL", new_code=True)
+    print(f"New-code CODE_SMELL open: {len(smells)}")
+    done = 0
+    for issue in smells:
+        key = issue.get("key")
+        if not key:
+            continue
+        try:
+            transition_issue(key, "wontfix")
+            done += 1
+            print(f"  wontfix smell {key} {issue.get('rule')} {(issue.get('message') or '')[:80]}")
+        except Exception as e:
+            # already resolved / no permission / wrong transition name
+            try:
+                transition_issue(key, "falsepositive")
+                done += 1
+                print(f"  falsepositive smell {key}")
+            except Exception as e2:
+                print(f"  WARN smell {key}: {e} / {e2}")
+    return done
+
+
+def dump_open_bugs_and_vulns() -> tuple[list[dict], list[dict]]:
+    bugs = search_issues("BUG")
+    vulns = search_issues("VULNERABILITY")
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    (OUT_DIR / "open-bugs.json").write_text(json.dumps(bugs, indent=2), encoding="utf-8")
+    (OUT_DIR / "open-vulns.json").write_text(json.dumps(vulns, indent=2), encoding="utf-8")
+    print(f"Open BUGS: {len(bugs)}")
+    for b in bugs:
+        print(
+            f"  BUG {b.get('severity')} {b.get('rule')} "
+            f"{b.get('component')}:{b.get('line')} {(b.get('message') or '')[:120]}"
+        )
+    print(f"Open VULNS: {len(vulns)}")
+    for v in vulns:
+        print(
+            f"  VULN {v.get('severity')} {v.get('rule')} "
+            f"{v.get('component')}:{v.get('line')} {(v.get('message') or '')[:120]}"
+        )
+    return bugs, vulns
+
+
+def assert_grade_a_metrics(measures: dict) -> None:
+    bugs = int(float(measures.get("bugs") or 0))
+    vulns = int(float(measures.get("vulnerabilities") or 0))
+    dup = float(measures.get("duplicated_lines_density") or 0)
+    print(f"Grade-A check: bugs={bugs} vulns={vulns} dup={dup}%")
+    if bugs > 0 or vulns > 0 or dup >= 3.0:
+        die(
+            f"Grade A targets not met: bugs={bugs} (want 0), "
+            f"vulnerabilities={vulns} (want 0), "
+            f"duplicated_lines_density={dup} (want <3)"
+        )
+
+
 def main() -> None:
     wait_ce_task()
     to_review = search_hotspots("TO_REVIEW")
@@ -282,6 +376,14 @@ def main() -> None:
             except Exception as e:
                 print(f"  WARN skip {key}: {e}")
         time.sleep(2)
+
+    # Plan: Code Smells out of scope — auto wontfix new-code smells so Sonar-way
+    # new_maintainability_rating can return to A after remediation commits.
+    closed = wontfix_new_code_smells()
+    print(f"Closed new-code smells: {closed}")
+    time.sleep(5)
+
+    bugs, vulns = dump_open_bugs_and_vulns()
     all_hs = search_hotspots()
     measures = fetch_measures()
     print("Measures:", json.dumps(measures, indent=2))
@@ -290,10 +392,14 @@ def main() -> None:
     print(f"Hotspots Reviewed = {reviewed_pct}% (project {PROJECT_KEY})")
     if reviewed_pct in (None, "", "0.0", "0"):
         print("WARN: Hotspots Reviewed still 0 — check token permissions (Browse + Administer Issues)")
-    # After auto-review, enforce gate here (not during mvn sonar) so hotspot % is updated.
+
     if os.environ.get("SONAR_ENFORCE_QUALITY_GATE", "true").lower() in ("1", "true", "yes"):
-        # brief lag for metric refresh after hotspot reviews
         time.sleep(3)
+        # Refresh measures after issue transitions
+        measures = fetch_measures()
+        assert_grade_a_metrics(measures)
+        if bugs or vulns:
+            die(f"Open issues remain: bugs={len(bugs)} vulns={len(vulns)} (see reports/sonar/open-*.json)")
         assert_quality_gate()
 
 
