@@ -26,11 +26,13 @@ if [ "${SKIP_BUILD:-0}" != "1" ]; then
   fi
 fi
 
-# 2) Infra (optional)
+# 2) Infra (namespace only; MySQL left alone unless SKIP_MYSQL=0)
 kubectl apply -f "${KD}/namespace.yaml"
-if [ -f "${KD}/mysql.yaml" ]; then
+if [ "${SKIP_MYSQL:-1}" != "1" ] && [ -f "${KD}/mysql.yaml" ]; then
   kubectl apply -f "${KD}/mysql.yaml"
   kubectl rollout status "deployment/mysql" -n "${NS}" --timeout="${WAIT}" || true
+else
+  echo "== SKIP_MYSQL=1 — MySQL not applied"
 fi
 
 # 3) Java app

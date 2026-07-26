@@ -15,6 +15,8 @@ FE_IMAGE="${FE_IMAGE:-${HARBOR_HOST}/${HARBOR_PROJECT}/warehouse-frontend:${TAG}
 WAIT="${WAIT_TIMEOUT:-600s}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
 SKIP_PUSH="${SKIP_PUSH:-0}"
+# GitHub CD sets SKIP_MYSQL=1 — do not apply/restart MySQL
+SKIP_MYSQL="${SKIP_MYSQL:-1}"
 
 echo "== ns=${NS} harbor=${HARBOR_HOST}/${HARBOR_PROJECT} tag=${TAG}"
 echo "== app=${APP_IMAGE}"
@@ -92,17 +94,25 @@ kubectl -n "${NS}" create secret docker-registry harbor-cred \
   --docker-password="${HARBOR_PASS}" \
   --dry-run=client -o yaml | kubectl apply -f -
 
-echo "== mysql init ConfigMap"
-kubectl -n "${NS}" create configmap mysql-initdb \
-  --from-file=01_schema.sql="${ROOT}/db/springboot38hdw40x.sql" \
-  --from-file=02_ai.sql="${ROOT}/db/migration_ai_assistant.sql" \
-  --from-file=03_user_role_demo.sql="${ROOT}/db/migration_user_role_and_demo_fix.sql" \
-  --dry-run=client -o yaml | kubectl apply -f -
+if [ "${SKIP_MYSQL}" = "1" ]; then
+  echo "== SKIP_MYSQL=1 — leave MySQL deployment/config untouched"
+  if kubectl -n "${NS}" get deploy mysql >/dev/null 2>&1; then
+    kubectl -n "${NS}" get deploy,pods -l app=mysql -o wide || true
+  else
+    echo "WARN: mysql not found in ${NS}; ensure DB already exists"
+  fi
+else
+  echo "== mysql init ConfigMap"
+  kubectl -n "${NS}" create configmap mysql-initdb \
+    --from-file=01_schema.sql="${ROOT}/db/springboot38hdw40x.sql" \
+    --from-file=02_ai.sql="${ROOT}/db/migration_ai_assistant.sql" \
+    --from-file=03_user_role_demo.sql="${ROOT}/db/migration_user_role_and_demo_fix.sql" \
+    --dry-run=client -o yaml | kubectl apply -f -
+  kubectl apply -f "${KD}/mysql.yaml"
+  kubectl rollout status "deployment/mysql" -n "${NS}" --timeout="${WAIT}" || true
+fi
 
-kubectl apply -f "${KD}/mysql.yaml"
-kubectl rollout status "deployment/mysql" -n "${NS}" --timeout="${WAIT}" || true
-
-# Patch manifests defaults then set image to Harbor refs
+# Patch manifests defaults then set image to Harbor refs (app + frontend only)
 kubectl apply -f "${KD}/app.yaml"
 kubectl apply -f "${KD}/frontend.yaml"
 kubectl -n "${NS}" patch deployment warehouse-app --type strategic -p \

@@ -1,9 +1,11 @@
-# CD: sync → build → push Harbor → k8s pulls from Harbor
-# gate → sync → build → push-harbor → deploy-infrastructure → deploy-services → deploy-gateway → verify
+# CD after Cicd (SAST / unit / Trivy / Checkov / ZAP / k6 / JMeter / reports):
+# gate → sync → build → push-harbor → prepare-k8s → deploy-services(Java+FE) → deploy-gateway → verify
+# MySQL is intentionally NOT applied / restarted / rolled out.
 name: Deploy Aliyun
 
 on:
   workflow_dispatch:
+  # Auto-publish Java + frontend when Cicd completes successfully on master/main
   workflow_run:
     workflows: [Cicd]
     types: [completed]
@@ -198,8 +200,8 @@ jobs:
         if: always()
         run: rm -f "$GITHUB_WORKSPACE/.ssh_deploy_key"
 
-  deploy-infrastructure:
-    name: deploy-infrastructure
+  prepare-k8s:
+    name: prepare-k8s
     needs: push-harbor
     runs-on: ubuntu-latest
     steps:
@@ -210,7 +212,7 @@ jobs:
         env:
           SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
 
-      - name: MySQL + Harbor registry for k3s
+      - name: Namespace + Harbor pull secret only (skip MySQL)
         uses: appleboy/ssh-action@v1.2.1
         env:
           DEPLOY_PATH: ${{ vars.ALIYUN_DEPLOY_PATH }}
@@ -225,7 +227,7 @@ jobs:
           key_path: ${{ github.workspace }}/.ssh_deploy_key
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
-          command_timeout: 25m
+          command_timeout: 10m
           envs: DEPLOY_PATH,K8S_DIR,NAMESPACE,HARBOR_HOST,HARBOR_USER,HARBOR_PASSWORD
           script: |
             set -euo pipefail
@@ -236,41 +238,19 @@ jobs:
             HU="${HARBOR_USER:-admin}"
             HPW="${HARBOR_PASSWORD:-Harbor12345}"
             kubectl apply -f "${KD}/namespace.yaml"
-            mkdir -p /etc/rancher/k3s
-            cat > /etc/rancher/k3s/registries.yaml <<EOF
-            mirrors:
-              docker.io:
-                endpoint:
-                  - "https://docker.m.daocloud.io"
-                  - "https://docker.1ms.run"
-              "${HH}":
-                endpoint:
-                  - "http://${HH}"
-            configs:
-              "${HH}":
-                auth:
-                  username: ${HU}
-                  password: ${HPW}
-                tls:
-                  insecure_skip_verify: true
-            EOF
-            # fix leading spaces from heredoc indentation
-            sed -i 's/^            //' /etc/rancher/k3s/registries.yaml
-            systemctl restart k3s
-            sleep 12
+            # Pull secret for app/frontend images — do NOT apply mysql.yaml / mysql-initdb
             kubectl -n "${NS}" create secret docker-registry harbor-cred \
               --docker-server="${HH}" \
               --docker-username="${HU}" \
               --docker-password="${HPW}" \
               --dry-run=client -o yaml | kubectl apply -f -
-            kubectl -n "${NS}" create configmap mysql-initdb \
-              --from-file=01_schema.sql="${DP}/db/springboot38hdw40x.sql" \
-              --from-file=02_ai.sql="${DP}/db/migration_ai_assistant.sql" \
-              --from-file=03_user_role_demo.sql="${DP}/db/migration_user_role_and_demo_fix.sql" \
-              --dry-run=client -o yaml | kubectl apply -f -
-            kubectl apply -f "${KD}/mysql.yaml"
-            kubectl rollout status "deployment/mysql" -n "${NS}" --timeout=600s || true
-            echo "== infrastructure ok"
+            if kubectl -n "${NS}" get deploy mysql >/dev/null 2>&1; then
+              echo "== mysql already present — leaving untouched"
+              kubectl -n "${NS}" get deploy,pods -l app=mysql -o wide || true
+            else
+              echo "::warning::mysql deployment not found in ${NS}; app will need an existing DB endpoint"
+            fi
+            echo "== prepare-k8s ok (MySQL skipped)"
 
       - name: Remove SSH key
         if: always()
@@ -278,7 +258,7 @@ jobs:
 
   deploy-services:
     name: deploy-services
-    needs: deploy-infrastructure
+    needs: prepare-k8s
     runs-on: ubuntu-latest
     steps:
       - name: Write SSH private key
@@ -288,7 +268,7 @@ jobs:
         env:
           SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
 
-      - name: Deploy — k8s pull from Harbor
+      - name: Deploy Java + frontend only (Harbor → k8s)
         uses: appleboy/ssh-action@v1.2.1
         env:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
@@ -315,10 +295,19 @@ jobs:
             TAG="build.${GITHUB_RUN_NUMBER}"
             IMAGE="${HH}/${HP}/warehouse-app:${TAG}"
             FE_IMAGE="${HH}/${HP}/warehouse-frontend:${TAG}"
+            # Only Java API + Vue frontend — never kubectl apply mysql.yaml here
             kubectl apply -f "${KD}/app.yaml"
             kubectl apply -f "${KD}/frontend.yaml"
+            kubectl -n "${NS}" patch deployment warehouse-app --type strategic -p \
+              '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"harbor-cred"}]}}}}'
+            kubectl -n "${NS}" patch deployment warehouse-frontend --type strategic -p \
+              '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"harbor-cred"}]}}}}'
             kubectl set image "deployment/warehouse-app" "app=${IMAGE}" -n "${NS}"
             kubectl set image "deployment/warehouse-frontend" "frontend=${FE_IMAGE}" -n "${NS}"
+            kubectl -n "${NS}" patch deployment warehouse-app -p \
+              '{"spec":{"template":{"spec":{"containers":[{"name":"app","imagePullPolicy":"Always"}]}}}}'
+            kubectl -n "${NS}" patch deployment warehouse-frontend -p \
+              '{"spec":{"template":{"spec":{"containers":[{"name":"frontend","imagePullPolicy":"Always"}]}}}}'
             kubectl rollout status "deployment/warehouse-app" -n "${NS}" --timeout=600s
             kubectl rollout status "deployment/warehouse-frontend" -n "${NS}" --timeout=600s
             NODE_IP="$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || echo 127.0.0.1)"
@@ -326,6 +315,7 @@ jobs:
             curl -fsS -o /dev/null "http://${NODE_IP}:30080/" && echo FE_OK
             kubectl get pods -n "${NS}" -o wide
             kubectl get deploy -n "${NS}" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.template.spec.containers[0].image}{"\n"}{end}'
+            echo "== deployed app=${IMAGE} fe=${FE_IMAGE} (mysql untouched)"
 
       - name: Remove SSH key
         if: always()
@@ -406,10 +396,11 @@ jobs:
       - name: Summary
         run: |
           cat >> "$GITHUB_STEP_SUMMARY" <<EOF
-          ## CD: code → Harbor → k3s
+          ## CD: Cicd → Harbor → Java + Frontend (MySQL untouched)
           - Images: \`121.40.253.17/warehouse/*:build.${{ github.run_number }}\`
           - Frontend: http://121.40.253.17:30080/
           - API: http://121.40.253.17:30081/springboot38hdw40x/
+          - MySQL: left as-is (not applied / not restarted)
           EOF
 
       - name: Remove SSH key
