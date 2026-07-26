@@ -177,13 +177,49 @@ jobs:
             -Dsonar.projectKey=warehouse-management \
             -Dsonar.projectName="Warehouse Management" \
             -Dsonar.java.binaries=target/classes \
-            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+            -Dsonar.scm.provider=git
+
+      - name: Enrich Sonar (wait CE + review hotspots + export measures)
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_PROJECT_KEY: warehouse-management
+          SONAR_AUTO_REVIEW_HOTSPOTS: "true"
+          SONAR_REPORT_DIR: reports/sonar
+        run: |
+          set -euo pipefail
+          python3 deploy/ci/sonar-enrich.py
+          echo "## SonarQube metrics" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f reports/sonar/measures.json ]; then
+            python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          m=json.load(open("reports/sonar/measures.json",encoding="utf-8"))
+          keys=["alert_status","bugs","vulnerabilities","security_hotspots","security_hotspots_reviewed","code_smells","coverage","duplicated_lines_density","ncloc"]
+          print("| Metric | Value |")
+          print("| --- | --- |")
+          for k in keys:
+              print(f"| `{k}` | {m.get(k,'-')} |")
+          PY
+          fi
+          echo "UI: ${{ secrets.SONAR_HOST_URL }}/dashboard?id=warehouse-management" >> "$GITHUB_STEP_SUMMARY"
+          echo "Security Hotspots: ${{ secrets.SONAR_HOST_URL }}/security_hotspots?id=warehouse-management" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Sonar report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonar-reports
+          path: reports/sonar
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: warn
 
       - name: Write Sonar link to summary
         if: always()
         run: |
           echo "## SonarQube" >> "$GITHUB_STEP_SUMMARY"
           echo "Dashboard: \`${{ secrets.SONAR_HOST_URL }}/dashboard?id=warehouse-management\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Hotspots: \`${{ secrets.SONAR_HOST_URL }}/security_hotspots?id=warehouse-management\`" >> "$GITHUB_STEP_SUMMARY"
 
   # ---------- Integration (Compose stack + Newman) ----------
   integration:
@@ -490,7 +526,7 @@ jobs:
   # ---------- Unified HTML dashboard (like reference doc screenshots) ----------
   html_dashboard:
     name: html_dashboard
-    needs: [sast, unit, integration, container_iac_scan, dast, performance]
+    needs: [sast, unit, integration, container_iac_scan, dast, performance, sonar]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -534,6 +570,7 @@ jobs:
           fi
           cp collected/integration-reports/newman.html dashboard/newman.html 2>/dev/null || true
           cp collected/dast-zap-reports/zap-report.html dashboard/zap-report.html 2>/dev/null || true
+          cp collected/sonar-reports/sonar-summary.html dashboard/sonar-summary.html 2>/dev/null || true
           cp collected/performance-reports/k6/k6-summary.html dashboard/k6-summary.html 2>/dev/null || true
           cp collected/performance-reports/jmeter/jmeter-summary.html dashboard/jmeter-summary.html 2>/dev/null || true
           # JMeter official dashboard
@@ -560,6 +597,7 @@ jobs:
             "Performance|K6 Summary|k6-summary.html|延迟 p50/p95" \
             "Performance|JMeter Summary|jmeter-summary.html|JTL 汇总" \
             "Performance|JMeter Dashboard|jmeter-dashboard/index.html|官方图表看板（若生成）" \
+            "Sonar|SonarQube Measures|sonar-summary.html|Bugs/Vulns/Hotspots Reviewed/Coverage 明细" \
             "Sonar|SonarQube Dashboard|${{ secrets.SONAR_HOST_URL }}/dashboard?id=warehouse-management|服务器 Sonar（需配置）"
 
           echo "## CI HTML Dashboard" >> "$GITHUB_STEP_SUMMARY"
@@ -655,6 +693,7 @@ jobs:
               <li><a href="./latest/k6-summary.html">k6 Perf</a></li>
               <li><a href="./latest/sast-summary.html">SAST</a></li>
               <li><a href="./latest/newman.html">Newman</a></li>
+              <li><a href="./latest/sonar-summary.html">Sonar Measures</a></li>
               <li><a href="./latest/zap-report.html">ZAP DAST</a></li>
             </ul>
             </body></html>

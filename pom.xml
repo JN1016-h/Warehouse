@@ -22,12 +22,19 @@
 		<mockito.version>4.11.0</mockito.version>
 		<bytebuddy.version>1.14.12</bytebuddy.version>
 		<skipTests>false</skipTests>
-		<!-- Sonar / JaCoCo (CI uploads coverage to remote SonarQube) -->
+		<!-- Sonar / JaCoCo (CI uploads coverage + issues to remote SonarQube) -->
 		<sonar.projectKey>warehouse-management</sonar.projectKey>
 		<sonar.projectName>Warehouse Management</sonar.projectName>
 		<sonar.java.coveragePlugin>jacoco</sonar.java.coveragePlugin>
 		<sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
-		<sonar.exclusions>**/src/main/resources/admin/**,**/node_modules/**,**/static/**</sonar.exclusions>
+		<sonar.sources>src/main/java,src/main/resources</sonar.sources>
+		<sonar.tests>src/test/java</sonar.tests>
+		<sonar.java.binaries>${project.build.directory}/classes</sonar.java.binaries>
+		<sonar.java.test.binaries>${project.build.directory}/test-classes</sonar.java.test.binaries>
+		<sonar.java.source>1.8</sonar.java.source>
+		<sonar.sourceEncoding>UTF-8</sonar.sourceEncoding>
+		<sonar.exclusions>**/src/main/resources/admin/**,**/node_modules/**,**/static/**,**/*.min.js</sonar.exclusions>
+		<sonar.coverage.exclusions>**/src/main/resources/**,**/dto/**,**/entity/**,**/config/**</sonar.coverage.exclusions>
 	</properties>
 
 	<dependencies>
