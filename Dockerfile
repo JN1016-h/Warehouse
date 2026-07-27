@@ -21,6 +21,17 @@ RUN mvn "-Dmaven.test.skip=true" package
 FROM ${REGISTRY_MIRROR}/eclipse-temurin:8-jre
 WORKDIR /app
 
+# Apply OS security updates for Trivy base-image CVEs (glibc/util-linux/etc.).
+USER root
+RUN if command -v apt-get >/dev/null 2>&1; then \
+      apt-get update \
+      && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y --no-install-recommends \
+      && apt-get clean \
+      && rm -rf /var/lib/apt/lists/*; \
+    elif command -v microdnf >/dev/null 2>&1; then \
+      microdnf upgrade -y && microdnf clean all; \
+    fi
+
 ENV JAVA_OPTS=""
 COPY --from=build /app/target/*.jar /app/app.jar
 
