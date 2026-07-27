@@ -836,60 +836,48 @@ jobs:
           ls -lh warehouse-src.tgz
           test -s warehouse-src.tgz
 
-      # Do NOT use appleboy/scp-action here: it wraps files in a second tar and
-      # extracts into target/. A root-owned /tmp/warehouse-src.tgz causes:
-      #   tar: warehouse-src.tgz: Cannot open: Permission denied
-      # Use OpenSSH scp into $HOME/warehouse-ci (user-writable).
+      # appleboy/scp-action auth works (same as Prepare). Avoid native openssh scp
+      # which failed with Permission denied (publickey) against the same secrets.
+      # Upload into a fresh per-run dir so nested untar does not hit a root-owned
+      # /tmp/warehouse-src.tgz (previous Permission denied on tar open).
       - name: Prepare remote upload dir
         uses: appleboy/ssh-action@v1.2.1
+        env:
+          RUN_ID: ${{ github.run_id }}
         with:
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
           key: ${{ secrets.ALIYUN_SSH_KEY }}
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
+          envs: RUN_ID
           script: |
             set -euo pipefail
-            mkdir -p "$HOME/warehouse-ci"
-            rm -f "$HOME/warehouse-ci/warehouse-src.tgz"
+            UPLOAD_DIR="/tmp/warehouse-upload-${RUN_ID}"
+            rm -rf "$UPLOAD_DIR" 2>/dev/null || true
+            mkdir -p "$UPLOAD_DIR"
+            chmod 755 "$UPLOAD_DIR"
             rm -f /tmp/warehouse-src.tgz 2>/dev/null || true
             sudo rm -f /tmp/warehouse-src.tgz 2>/dev/null || true
-            ls -ld "$HOME/warehouse-ci"
+            ls -ld "$UPLOAD_DIR"
 
       - name: Upload tarball
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
-          SSH_PASSPHRASE: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
-          ALIYUN_HOST: ${{ secrets.ALIYUN_HOST }}
-          ALIYUN_USER: ${{ secrets.ALIYUN_USER }}
-          ALIYUN_SSH_PORT: ${{ vars.ALIYUN_SSH_PORT || 22 }}
-        run: |
-          set -euo pipefail
-          KEY_FILE="$(mktemp)"
-          ASKPASS="$(mktemp)"
-          cleanup() { rm -f "$KEY_FILE" "$ASKPASS"; }
-          trap cleanup EXIT
-          printf '%s\n' "$SSH_PRIVATE_KEY" > "$KEY_FILE"
-          chmod 600 "$KEY_FILE"
-          eval "$(ssh-agent -s)"
-          if [ -n "${SSH_PASSPHRASE:-}" ]; then
-            printf '%s\n' '#!/bin/sh' 'printf "%s\n" "$SSH_PASSPHRASE"' > "$ASKPASS"
-            chmod 700 "$ASKPASS"
-            DISPLAY="${DISPLAY:-:0}" SSH_ASKPASS="$ASKPASS" SSH_ASKPASS_REQUIRE=force \
-              ssh-add "$KEY_FILE" </dev/null
-          else
-            ssh-add "$KEY_FILE" </dev/null
-          fi
-          PORT="${ALIYUN_SSH_PORT:-22}"
-          scp -P "$PORT" -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes \
-            ./warehouse-src.tgz \
-            "${ALIYUN_USER}@${ALIYUN_HOST}:warehouse-ci/warehouse-src.tgz"
-          echo "== upload ok bytes=$(wc -c < warehouse-src.tgz)"
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ALIYUN_HOST }}
+          username: ${{ secrets.ALIYUN_USER }}
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
+          passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
+          port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
+          source: "warehouse-src.tgz"
+          target: "/tmp/warehouse-upload-${{ github.run_id }}/"
+          overwrite: true
 
       - name: Extract on host
         uses: appleboy/ssh-action@v1.2.1
         env:
           DEPLOY_PATH: ${{ vars.ALIYUN_DEPLOY_PATH }}
+          RUN_ID: ${{ github.run_id }}
         with:
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
@@ -897,17 +885,18 @@ jobs:
           passphrase: ${{ secrets.ALIYUN_SSH_KEY_PASSPHRASE }}
           port: ${{ vars.ALIYUN_SSH_PORT || 22 }}
           command_timeout: 10m
-          envs: DEPLOY_PATH
+          envs: DEPLOY_PATH,RUN_ID
           script: |
             set -euo pipefail
             DP="${DEPLOY_PATH:-/opt/deploy/warehouse-management-project}"
-            TGZ="$HOME/warehouse-ci/warehouse-src.tgz"
+            TGZ="/tmp/warehouse-upload-${RUN_ID}/warehouse-src.tgz"
             test -s "$TGZ"
             mkdir -p "$DP"
             tar -xzf "$TGZ" -C "$DP"
             sed -i 's/\r$//' "$DP"/k8s/*.sh || true
             chmod +x "$DP"/k8s/*.sh
             test -f "$DP/Dockerfile" && test -f "$DP/k8s/apply-stack.sh"
+            rm -rf "/tmp/warehouse-upload-${RUN_ID}" || true
             echo "== sync ok path=${DP}"
 
   build:
