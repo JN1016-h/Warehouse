@@ -72,6 +72,7 @@ jobs:
           fi
           test -s "$OUT"
           cp -f "$OUT" warehouse-src.tgz
+          chmod 644 warehouse-src.tgz
           ls -lh warehouse-src.tgz
           test -s warehouse-src.tgz
 
