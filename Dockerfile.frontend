@@ -6,9 +6,10 @@ RUN npm ci
 COPY src/main/resources/admin/admin/ ./
 RUN node ./node_modules/@vue/cli-service/bin/vue-cli-service.js build
 
-FROM ${REGISTRY_MIRROR}/nginx:1.25-alpine
+FROM ${REGISTRY_MIRROR}/nginx:1.27-alpine
 # Apply Alpine security patches for Trivy OS findings on the frontend image.
-RUN apk update && apk upgrade --no-cache
+RUN apk update && apk upgrade --no-cache \
+ && apk del --no-cache wget 2>/dev/null || true
 COPY docker/frontend-ci.nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /fe/dist /usr/share/nginx/html
 EXPOSE 80

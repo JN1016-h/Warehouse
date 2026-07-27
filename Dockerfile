@@ -22,10 +22,13 @@ FROM ${REGISTRY_MIRROR}/eclipse-temurin:8-jre
 WORKDIR /app
 
 # Apply OS security updates for Trivy base-image CVEs (glibc/util-linux/etc.).
+# dist-upgrade picks up newer util-linux/glibc when Ubuntu publishes them;
+# purge tools not needed at runtime to shrink the OS attack surface.
 USER root
 RUN if command -v apt-get >/dev/null 2>&1; then \
       apt-get update \
-      && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y --no-install-recommends \
+      && DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y --no-install-recommends \
+      && DEBIAN_FRONTEND=noninteractive apt-get purge -y --auto-remove wget 2>/dev/null || true \
       && apt-get clean \
       && rm -rf /var/lib/apt/lists/*; \
     elif command -v microdnf >/dev/null 2>&1; then \

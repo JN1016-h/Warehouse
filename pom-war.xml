@@ -21,11 +21,13 @@
 		<fastjson.version>1.2.83</fastjson.version>
 		<maven-jar-plugin.version>3.1.1</maven-jar-plugin.version>
 		<logback.version>1.2.13</logback.version>
-		<tomcat.version>9.0.113</tomcat.version>
-		<jackson-bom.version>2.17.3</jackson-bom.version>
-		<snakeyaml.version>1.33</snakeyaml.version>
+		<tomcat.version>9.0.120</tomcat.version>
+		<jackson-bom.version>2.18.8</jackson-bom.version>
+		<snakeyaml.version>2.2</snakeyaml.version>
 		<spring-framework.version>5.3.39</spring-framework.version>
 		<mybatis-plus.version>3.5.7</mybatis-plus.version>
+		<commons-compress.version>1.27.1</commons-compress.version>
+		<poi.version>5.4.0</poi.version>
 	</properties>
 
 	<dependencies>
@@ -60,8 +62,13 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>3.17.0</version>
+            <version>3.18.0</version>
         </dependency>
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-compress</artifactId>
+			<version>${commons-compress.version}</version>
+		</dependency>
 		<dependency>
 		    <groupId>javax.validation</groupId>
 		    <artifactId>validation-api</artifactId>
@@ -130,12 +137,12 @@
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi</artifactId>
-            <version>5.2.5</version>
+            <version>${poi.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
-            <version>5.2.5</version>
+            <version>${poi.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
