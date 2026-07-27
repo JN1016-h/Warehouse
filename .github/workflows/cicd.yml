@@ -1072,8 +1072,29 @@ jobs:
             kubectl -n "${NS}" annotate deployment warehouse-app warehouse-frontend \
               "warehouse.io/image-tag=${TAG}" \
               "kubectl.kubernetes.io/restartedAt=$(date -u +%Y-%m-%dT%H:%M:%SZ)" --overwrite
-            kubectl rollout status "deployment/warehouse-app" -n "${NS}" --timeout=600s
-            kubectl rollout status "deployment/warehouse-frontend" -n "${NS}" --timeout=600s
+            if ! kubectl rollout status "deployment/warehouse-app" -n "${NS}" --timeout=900s; then
+              echo "::error::warehouse-app rollout failed; dumping diagnostics"
+              kubectl -n "${NS}" get deploy,rs,po -l app=warehouse-app -o wide || true
+              kubectl -n "${NS}" describe deploy warehouse-app || true
+              kubectl -n "${NS}" get events --field-selector involvedObject.name=warehouse-app --sort-by=.lastTimestamp | tail -n 40 || true
+              for p in $(kubectl -n "${NS}" get po -l app=warehouse-app -o jsonpath='{.items[*].metadata.name}'); do
+                echo "===== describe ${p} ====="
+                kubectl -n "${NS}" describe po "${p}" || true
+                echo "===== logs ${p} ====="
+                kubectl -n "${NS}" logs "${p}" --tail=120 || true
+                kubectl -n "${NS}" logs "${p}" --previous --tail=80 || true
+              done
+              exit 1
+            fi
+            if ! kubectl rollout status "deployment/warehouse-frontend" -n "${NS}" --timeout=600s; then
+              echo "::error::warehouse-frontend rollout failed; dumping diagnostics"
+              kubectl -n "${NS}" get po -l app=warehouse-frontend -o wide || true
+              kubectl -n "${NS}" describe deploy warehouse-frontend || true
+              for p in $(kubectl -n "${NS}" get po -l app=warehouse-frontend -o jsonpath='{.items[*].metadata.name}'); do
+                kubectl -n "${NS}" logs "${p}" --tail=80 || true
+              done
+              exit 1
+            fi
             APP_LIVE="$(kubectl -n "${NS}" get deploy warehouse-app -o jsonpath='{.spec.template.spec.containers[0].image}')"
             FE_LIVE="$(kubectl -n "${NS}" get deploy warehouse-frontend -o jsonpath='{.spec.template.spec.containers[0].image}')"
             [ "${APP_LIVE}" = "${IMAGE}" ] || { echo "::error::app image mismatch"; exit 1; }

@@ -52,10 +52,11 @@ metadata:
 spec:
   replicas: 1
   revisionHistoryLimit: 5
+  progressDeadlineSeconds: 1200
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 0
+      maxUnavailable: 1
       maxSurge: 1
   selector:
     matchLabels:
@@ -98,23 +99,23 @@ spec:
             httpGet:
               path: /springboot38hdw40x/config/list?page=1&limit=1
               port: http
-            initialDelaySeconds: 25
+            initialDelaySeconds: 20
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 6
+            failureThreshold: 12
           livenessProbe:
             httpGet:
               path: /springboot38hdw40x/config/list?page=1&limit=1
               port: http
-            initialDelaySeconds: 60
+            initialDelaySeconds: 90
             periodSeconds: 20
             timeoutSeconds: 5
-            failureThreshold: 3
+            failureThreshold: 5
           startupProbe:
             httpGet:
               path: /springboot38hdw40x/config/list?page=1&limit=1
               port: http
-            failureThreshold: 30
+            failureThreshold: 60
             periodSeconds: 5
 ---
 apiVersion: v1
