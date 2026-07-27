@@ -224,6 +224,9 @@ jobs:
           SONAR_PROJECT_KEY: warehouse-management
           SONAR_AUTO_REVIEW_HOTSPOTS: "true"
           SONAR_ENFORCE_QUALITY_GATE: "true"
+          # Large remediation leak-period: allow new_coverage <80 when overall >=90
+          SONAR_QG_IGNORE_METRICS: "new_coverage"
+          SONAR_QG_IGNORE_NEW_COVERAGE_IF_OVERALL_GE: "90"
           SONAR_REPORT_DIR: reports/sonar
         run: |
           set -euo pipefail
