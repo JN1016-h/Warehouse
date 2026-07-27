@@ -1,7 +1,8 @@
 package com.service.impl;
 
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
-import com.baomidou.mybatisplus.plugins.Page;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.dao.ChukuxinxiDao;
 import com.dao.DinghuoxinxiDao;
 import com.dao.RukuxinxiDao;
@@ -54,7 +55,7 @@ public class FinanceServiceImpl implements FinanceService {
         params.put("limit", query.getLimit() != null ? query.getLimit().toString() : "10");
         
         Page<ChukuxinxiEntity> page = new Query<ChukuxinxiEntity>(params).getPage();
-        EntityWrapper<ChukuxinxiEntity> wrapper = new EntityWrapper<>();
+        QueryWrapper<ChukuxinxiEntity> wrapper = new QueryWrapper<>();
         
         // 添加日期范围筛选
         if (query.getStartDate() != null) {
@@ -75,10 +76,11 @@ public class FinanceServiceImpl implements FinanceService {
         }
         
         // 按交货时间降序排列
-        wrapper.orderBy("jiaohuoshijian", false);
+        wrapper.orderBy(true, false, "jiaohuoshijian");
         
         // 查询出库信息
-        List<ChukuxinxiEntity> chukuxinxiList = chukuxinxiDao.selectPage(page, wrapper);
+        IPage<ChukuxinxiEntity> resultPage = chukuxinxiDao.selectPage(page, wrapper);
+        List<ChukuxinxiEntity> chukuxinxiList = resultPage.getRecords();
         
         // 转换为ReceivableDTO
         List<ReceivableDTO> receivableDTOList = new ArrayList<>();
@@ -87,8 +89,8 @@ public class FinanceServiceImpl implements FinanceService {
             receivableDTOList.add(dto);
         }
         
-        page.setRecords((List) receivableDTOList);
-        return new PageUtils(page);
+        resultPage.setRecords((List) receivableDTOList);
+        return new PageUtils(resultPage);
     }
     
     @Override
@@ -98,7 +100,7 @@ public class FinanceServiceImpl implements FinanceService {
         params.put("limit", query.getLimit() != null ? query.getLimit().toString() : "10");
         
         Page<RukuxinxiEntity> page = new Query<RukuxinxiEntity>(params).getPage();
-        EntityWrapper<RukuxinxiEntity> wrapper = new EntityWrapper<>();
+        QueryWrapper<RukuxinxiEntity> wrapper = new QueryWrapper<>();
         
         // 添加日期范围筛选
         if (query.getStartDate() != null) {
@@ -119,10 +121,11 @@ public class FinanceServiceImpl implements FinanceService {
         }
         
         // 按入库时间降序排列
-        wrapper.orderBy("rukushijian", false);
+        wrapper.orderBy(true, false, "rukushijian");
         
         // 查询入库信息
-        List<RukuxinxiEntity> rukuxinxiList = rukuxinxiDao.selectPage(page, wrapper);
+        IPage<RukuxinxiEntity> resultPage = rukuxinxiDao.selectPage(page, wrapper);
+        List<RukuxinxiEntity> rukuxinxiList = resultPage.getRecords();
         
         // 转换为PayableDTO
         List<PayableDTO> payableDTOList = new ArrayList<>();
@@ -131,8 +134,8 @@ public class FinanceServiceImpl implements FinanceService {
             payableDTOList.add(dto);
         }
         
-        page.setRecords((List) payableDTOList);
-        return new PageUtils(page);
+        resultPage.setRecords((List) payableDTOList);
+        return new PageUtils(resultPage);
     }
 
     
@@ -190,7 +193,7 @@ public class FinanceServiceImpl implements FinanceService {
     
     @Override
     public FinanceSummary calculateReceivableSummary(ReceivableQuery query) {
-        EntityWrapper<ChukuxinxiEntity> wrapper = new EntityWrapper<>();
+        QueryWrapper<ChukuxinxiEntity> wrapper = new QueryWrapper<>();
         
         // 添加日期范围筛选
         if (query.getStartDate() != null) {
@@ -247,7 +250,7 @@ public class FinanceServiceImpl implements FinanceService {
     
     @Override
     public FinanceSummary calculatePayableSummary(PayableQuery query) {
-        EntityWrapper<RukuxinxiEntity> wrapper = new EntityWrapper<>();
+        QueryWrapper<RukuxinxiEntity> wrapper = new QueryWrapper<>();
         
         // 添加日期范围筛选
         if (query.getStartDate() != null) {
@@ -360,10 +363,10 @@ public class FinanceServiceImpl implements FinanceService {
      */
     private BigDecimal calculateReceivableAmount(ChukuxinxiEntity chukuxinxi) {
         // 尝试通过服装编号查找对应的订货信息
-        EntityWrapper<DinghuoxinxiEntity> wrapper = new EntityWrapper<>();
+        QueryWrapper<DinghuoxinxiEntity> wrapper = new QueryWrapper<>();
         wrapper.eq("fuzhuangbianhao", chukuxinxi.getFuzhuangbianhao());
         wrapper.eq("kehumingcheng", chukuxinxi.getKehumingcheng());
-        wrapper.orderBy("addtime", false);
+        wrapper.orderBy(true, false, "addtime");
         
         List<DinghuoxinxiEntity> dinghuoxinxiList = dinghuoxinxiDao.selectList(wrapper);
         
@@ -397,10 +400,10 @@ public class FinanceServiceImpl implements FinanceService {
         }
         
         // 尝试通过服装编号和供应商名称查找对应的订货信息
-        EntityWrapper<DinghuoxinxiEntity> wrapper = new EntityWrapper<>();
+        QueryWrapper<DinghuoxinxiEntity> wrapper = new QueryWrapper<>();
         wrapper.eq("fuzhuangbianhao", rukuxinxi.getFuzhuangbianhao());
         wrapper.eq("gongyingshangmingcheng", rukuxinxi.getGongyingshangmingcheng());
-        wrapper.orderBy("addtime", false);
+        wrapper.orderBy(true, false, "addtime");
         
         List<DinghuoxinxiEntity> dinghuoxinxiList = dinghuoxinxiDao.selectList(wrapper);
         

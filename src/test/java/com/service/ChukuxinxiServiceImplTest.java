@@ -1,7 +1,7 @@
 package com.service;
 
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
-import com.baomidou.mybatisplus.plugins.Page;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.dao.ChukuxinxiDao;
 import com.entity.ChukuxinxiEntity;
 import com.entity.view.ChukuxinxiView;
@@ -43,7 +43,7 @@ public class ChukuxinxiServiceImplTest {
         params.put("page", "1");
         params.put("limit", "10");
         Page<ChukuxinxiEntity> page = new Page<ChukuxinxiEntity>(1, 10);
-        doReturn(page).when(service).selectPage(any(Page.class), any(EntityWrapper.class));
+        doReturn(page).when(service).selectPage(any(Page.class), any(QueryWrapper.class));
         assertNotNull(service.queryPage(params));
     }
 
@@ -52,34 +52,34 @@ public class ChukuxinxiServiceImplTest {
         Map<String, Object> params = new HashMap<String, Object>();
         params.put("page", "1");
         params.put("limit", "10");
-        when(chukuxinxiDao.selectListView(any(Page.class), any(EntityWrapper.class)))
+        when(chukuxinxiDao.selectListView(any(Page.class), any(QueryWrapper.class)))
                 .thenReturn(Collections.<ChukuxinxiView>emptyList());
-        assertNotNull(service.queryPage(params, new EntityWrapper<ChukuxinxiEntity>()));
+        assertNotNull(service.queryPage(params, new QueryWrapper<ChukuxinxiEntity>()));
     }
 
     @Test
     public void selectListVODelegates() {
-        when(chukuxinxiDao.selectListVO(any(EntityWrapper.class)))
+        when(chukuxinxiDao.selectListVO(any(QueryWrapper.class)))
                 .thenReturn(Collections.<ChukuxinxiVO>emptyList());
-        assertNotNull(service.selectListVO(new EntityWrapper<ChukuxinxiEntity>()));
+        assertNotNull(service.selectListVO(new QueryWrapper<ChukuxinxiEntity>()));
     }
 
     @Test
     public void selectVODelegates() {
-        when(chukuxinxiDao.selectVO(any(EntityWrapper.class))).thenReturn(new ChukuxinxiVO());
-        assertNotNull(service.selectVO(new EntityWrapper<ChukuxinxiEntity>()));
+        when(chukuxinxiDao.selectVO(any(QueryWrapper.class))).thenReturn(new ChukuxinxiVO());
+        assertNotNull(service.selectVO(new QueryWrapper<ChukuxinxiEntity>()));
     }
 
     @Test
     public void selectListViewDelegates() {
-        when(chukuxinxiDao.selectListView(any(EntityWrapper.class)))
+        when(chukuxinxiDao.selectListView(any(QueryWrapper.class)))
                 .thenReturn(Collections.<ChukuxinxiView>emptyList());
-        assertNotNull(service.selectListView(new EntityWrapper<ChukuxinxiEntity>()));
+        assertNotNull(service.selectListView(new QueryWrapper<ChukuxinxiEntity>()));
     }
 
     @Test
     public void selectViewDelegates() {
-        when(chukuxinxiDao.selectView(any(EntityWrapper.class))).thenReturn(new ChukuxinxiView());
-        assertNotNull(service.selectView(new EntityWrapper<ChukuxinxiEntity>()));
+        when(chukuxinxiDao.selectView(any(QueryWrapper.class))).thenReturn(new ChukuxinxiView());
+        assertNotNull(service.selectView(new QueryWrapper<ChukuxinxiEntity>()));
     }
 }

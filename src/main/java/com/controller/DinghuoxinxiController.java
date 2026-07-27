@@ -26,8 +26,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
-import com.baomidou.mybatisplus.mapper.Wrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.annotation.IgnoreAuth;
 
 import com.entity.DinghuoxinxiEntity;
@@ -74,7 +74,7 @@ public class DinghuoxinxiController {
 		if(tableName.equals("yonghu")) {
 			dinghuoxinxi.setZhanghao((String)request.getSession().getAttribute("username"));
 		}
-        EntityWrapper<DinghuoxinxiEntity> ew = new EntityWrapper<DinghuoxinxiEntity>();
+        QueryWrapper<DinghuoxinxiEntity> ew = new QueryWrapper<DinghuoxinxiEntity>();
 
 
 
@@ -91,7 +91,7 @@ public class DinghuoxinxiController {
     @RequestMapping("/list")
     public R list(@RequestParam Map<String, Object> params,DinghuoxinxiEntity dinghuoxinxi, 
 		HttpServletRequest request){
-        EntityWrapper<DinghuoxinxiEntity> ew = new EntityWrapper<DinghuoxinxiEntity>();
+        QueryWrapper<DinghuoxinxiEntity> ew = new QueryWrapper<DinghuoxinxiEntity>();
 
 		PageUtils page = dinghuoxinxiService.queryPage(params, MPUtil.sort(MPUtil.between(MPUtil.likeOrEq(ew, dinghuoxinxi), params), params));
 		
@@ -107,7 +107,7 @@ public class DinghuoxinxiController {
      */
     @RequestMapping("/lists")
     public R list( DinghuoxinxiEntity dinghuoxinxi){
-       	EntityWrapper<DinghuoxinxiEntity> ew = new EntityWrapper<DinghuoxinxiEntity>();
+       	QueryWrapper<DinghuoxinxiEntity> ew = new QueryWrapper<DinghuoxinxiEntity>();
       	ew.allEq(MPUtil.allEQMapPre( dinghuoxinxi, "dinghuoxinxi")); 
         return R.ok().put("data", dinghuoxinxiService.selectListView(ew));
     }
@@ -117,7 +117,7 @@ public class DinghuoxinxiController {
      */
     @RequestMapping("/query")
     public R query(DinghuoxinxiEntity dinghuoxinxi){
-        EntityWrapper< DinghuoxinxiEntity> ew = new EntityWrapper< DinghuoxinxiEntity>();
+        QueryWrapper< DinghuoxinxiEntity> ew = new QueryWrapper< DinghuoxinxiEntity>();
  		ew.allEq(MPUtil.allEQMapPre( dinghuoxinxi, "dinghuoxinxi")); 
 		DinghuoxinxiView dinghuoxinxiView =  dinghuoxinxiService.selectView(ew);
 		return R.ok("查询订货信息成功").put("data", dinghuoxinxiView);
@@ -128,7 +128,7 @@ public class DinghuoxinxiController {
      */
     @RequestMapping("/info/{id}")
     public R info(@PathVariable("id") Long id){
-        DinghuoxinxiEntity dinghuoxinxi = dinghuoxinxiService.selectById(id);
+        DinghuoxinxiEntity dinghuoxinxi = dinghuoxinxiService.getById(id);
 				Map<String, String> deSens = new HashMap<>();
 				DeSensUtil.desensitize(dinghuoxinxi,deSens);
         return R.ok().put("data", dinghuoxinxi);
@@ -140,7 +140,7 @@ public class DinghuoxinxiController {
 	@IgnoreAuth
     @RequestMapping("/detail/{id}")
     public R detail(@PathVariable("id") Long id){
-        DinghuoxinxiEntity dinghuoxinxi = dinghuoxinxiService.selectById(id);
+        DinghuoxinxiEntity dinghuoxinxi = dinghuoxinxiService.getById(id);
 				Map<String, String> deSens = new HashMap<>();
 				DeSensUtil.desensitize(dinghuoxinxi,deSens);
         return R.ok().put("data", dinghuoxinxi);
@@ -155,7 +155,7 @@ public class DinghuoxinxiController {
     @RequestMapping("/save")
     public R save(@RequestBody DinghuoxinxiEntity dinghuoxinxi, HttpServletRequest request){
     	//ValidatorUtils.validateEntity(dinghuoxinxi);
-        dinghuoxinxiService.insert(dinghuoxinxi);
+        dinghuoxinxiService.save(dinghuoxinxi);
         return R.ok();
     }
     
@@ -165,7 +165,7 @@ public class DinghuoxinxiController {
     @RequestMapping("/add")
     public R add(@RequestBody DinghuoxinxiEntity dinghuoxinxi, HttpServletRequest request){
     	//ValidatorUtils.validateEntity(dinghuoxinxi);
-        dinghuoxinxiService.insert(dinghuoxinxi);
+        dinghuoxinxiService.save(dinghuoxinxi);
         return R.ok().put("data",dinghuoxinxi.getId());
     }
 
@@ -195,7 +195,7 @@ public class DinghuoxinxiController {
      */
     @RequestMapping("/delete")
     public R delete(@RequestBody Long[] ids){
-        dinghuoxinxiService.deleteBatchIds(Arrays.asList(ids));
+        dinghuoxinxiService.removeByIds(Arrays.asList(ids));
         return R.ok();
     }
     
@@ -221,7 +221,7 @@ public class DinghuoxinxiController {
         Map<String, Object> params = new HashMap<String, Object>();
         params.put("xColumn", xColumnName);
         params.put("yColumn", yColumnName);
-        EntityWrapper<DinghuoxinxiEntity> ew = new EntityWrapper<DinghuoxinxiEntity>();
+        QueryWrapper<DinghuoxinxiEntity> ew = new QueryWrapper<DinghuoxinxiEntity>();
         String tableName = request.getSession().getAttribute("tableName").toString();
                                                             if(tableName.equals("yonghu")) {
             ew.eq("zhanghao", (String)request.getSession().getAttribute("username"));
@@ -260,7 +260,7 @@ public class DinghuoxinxiController {
         params.put("xColumn", xColumnName);
         List<List<Map<String, Object>>> result2 = new ArrayList<List<Map<String,Object>>>();
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-        EntityWrapper<DinghuoxinxiEntity> ew = new EntityWrapper<DinghuoxinxiEntity>();
+        QueryWrapper<DinghuoxinxiEntity> ew = new QueryWrapper<DinghuoxinxiEntity>();
 String tableName = request.getSession().getAttribute("tableName").toString();
                                                             if(tableName.equals("yonghu")) {
             ew.eq("zhanghao", (String)request.getSession().getAttribute("username"));
@@ -295,7 +295,7 @@ String tableName = request.getSession().getAttribute("tableName").toString();
             params.put("xColumn", xColumnName);
             params.put("yColumn", yColumnName);
             params.put("timeStatType", timeStatType);
-            EntityWrapper<DinghuoxinxiEntity> ew = new EntityWrapper<DinghuoxinxiEntity>();
+            QueryWrapper<DinghuoxinxiEntity> ew = new QueryWrapper<DinghuoxinxiEntity>();
     String tableName = request.getSession().getAttribute("tableName").toString();
                                                                                                                                                                         if(tableName.equals("yonghu")) {
                 ew.eq("zhanghao", (String)request.getSession().getAttribute("username"));
@@ -330,7 +330,7 @@ String tableName = request.getSession().getAttribute("tableName").toString();
             params.put("timeStatType", timeStatType);
             List<List<Map<String, Object>>> result2 = new ArrayList<List<Map<String,Object>>>();
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-            EntityWrapper<DinghuoxinxiEntity> ew = new EntityWrapper<DinghuoxinxiEntity>();
+            QueryWrapper<DinghuoxinxiEntity> ew = new QueryWrapper<DinghuoxinxiEntity>();
     String tableName = request.getSession().getAttribute("tableName").toString();
                                                                                                                                                                         if(tableName.equals("yonghu")) {
                 ew.eq("zhanghao", (String)request.getSession().getAttribute("username"));
@@ -363,7 +363,7 @@ String tableName = request.getSession().getAttribute("tableName").toString();
         }else{
         Map<String, Object> params = new HashMap<String, Object>();
         params.put("column", columnName);
-        EntityWrapper<DinghuoxinxiEntity> ew = new EntityWrapper<DinghuoxinxiEntity>();
+        QueryWrapper<DinghuoxinxiEntity> ew = new QueryWrapper<DinghuoxinxiEntity>();
 String tableName = request.getSession().getAttribute("tableName").toString();
                                                             if(tableName.equals("yonghu")) {
             ew.eq("zhanghao", (String)request.getSession().getAttribute("username"));
@@ -395,8 +395,8 @@ String tableName = request.getSession().getAttribute("tableName").toString();
         if(tableName.equals("yonghu")) {
             dinghuoxinxi.setZhanghao((String)request.getSession().getAttribute("username"));
         }
-        EntityWrapper<DinghuoxinxiEntity> ew = new EntityWrapper<DinghuoxinxiEntity>();
-        int count = dinghuoxinxiService.selectCount(MPUtil.sort(MPUtil.between(MPUtil.likeOrEq(ew, dinghuoxinxi), params), params));
+        QueryWrapper<DinghuoxinxiEntity> ew = new QueryWrapper<DinghuoxinxiEntity>();
+        long count = dinghuoxinxiService.count(MPUtil.sort(MPUtil.between(MPUtil.likeOrEq(ew, dinghuoxinxi), params), params));
         return R.ok().put("data", count);
     }
 

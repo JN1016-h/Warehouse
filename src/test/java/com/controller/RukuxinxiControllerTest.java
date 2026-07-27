@@ -76,14 +76,14 @@ public class RukuxinxiControllerTest {
 
     @Test
     public void testInfo() {
-        when(rukuxinxiService.selectById(1L)).thenReturn(new RukuxinxiEntity());
+        when(rukuxinxiService.getById(1L)).thenReturn(new RukuxinxiEntity());
         R result = controller.info(1L);
         assertEquals(0, result.get("code"));
     }
 
     @Test
     public void testDetail() {
-        when(rukuxinxiService.selectById(1L)).thenReturn(new RukuxinxiEntity());
+        when(rukuxinxiService.getById(1L)).thenReturn(new RukuxinxiEntity());
         R result = controller.detail(1L);
         assertEquals(0, result.get("code"));
     }
@@ -97,7 +97,7 @@ public class RukuxinxiControllerTest {
 
         ShangpinxinxiEntity product = new ShangpinxinxiEntity();
         product.setFuzhuangkucun(5);
-        when(shangpinxinxiService.selectOne(any())).thenReturn(product);
+        when(shangpinxinxiService.getOne(any())).thenReturn(product);
 
         R result = controller.save(entity,
                 ControllerTestSupport.mockRequestWithSession("yonghu", "user1", 1L, "张三"));
@@ -167,7 +167,7 @@ public class RukuxinxiControllerTest {
 
     @Test
     public void testCount() {
-        when(rukuxinxiService.selectCount(any())).thenReturn(7);
+        when(rukuxinxiService.count(any())).thenReturn(7);
         R result = controller.count(ControllerTestSupport.pageParams(), new RukuxinxiEntity(),
                 ControllerTestSupport.mockAdminRequest());
         assertEquals(0, result.get("code"));
@@ -178,7 +178,7 @@ public class RukuxinxiControllerTest {
         RukuxinxiEntity entity = new RukuxinxiEntity();
         entity.setFuzhuangbianhao("MISSING");
         entity.setFuzhuangkucun(10);
-        when(shangpinxinxiService.selectOne(any())).thenReturn(null);
+        when(shangpinxinxiService.getOne(any())).thenReturn(null);
 
         R result = controller.save(entity,
                 ControllerTestSupport.mockRequestWithSession("yonghu", "user1", 1L, "张三"));
@@ -221,7 +221,7 @@ public class RukuxinxiControllerTest {
 
         ShangpinxinxiEntity product = new ShangpinxinxiEntity();
         product.setFuzhuangkucun(null);
-        when(shangpinxinxiService.selectOne(any())).thenReturn(product);
+        when(shangpinxinxiService.getOne(any())).thenReturn(product);
 
         R result = controller.save(entity,
                 ControllerTestSupport.mockRequestWithSession("yonghu", "user1", 1L, "张三"));
@@ -237,7 +237,7 @@ public class RukuxinxiControllerTest {
 
         ShangpinxinxiEntity product = new ShangpinxinxiEntity();
         product.setFuzhuangkucun(5);
-        when(shangpinxinxiService.selectOne(any())).thenReturn(product);
+        when(shangpinxinxiService.getOne(any())).thenReturn(product);
 
         R result = controller.save(entity,
                 ControllerTestSupport.mockRequestWithSession("yonghu", "user1", 1L, "张三"));
@@ -268,7 +268,7 @@ public class RukuxinxiControllerTest {
 
     @Test
     public void testCountAsYonghu() {
-        when(rukuxinxiService.selectCount(any())).thenReturn(4);
+        when(rukuxinxiService.count(any())).thenReturn(4);
         R result = controller.count(ControllerTestSupport.pageParams(), new RukuxinxiEntity(),
                 ControllerTestSupport.mockRequestWithSession("yonghu", "user1", 1L, null));
         assertEquals(0, result.get("code"));
@@ -316,7 +316,7 @@ public class RukuxinxiControllerTest {
 
         ShangpinxinxiEntity product = new ShangpinxinxiEntity();
         product.setFuzhuangkucun(5);
-        when(shangpinxinxiService.selectOne(any())).thenReturn(product);
+        when(shangpinxinxiService.getOne(any())).thenReturn(product);
 
         R result = controller.save(entity,
                 ControllerTestSupport.mockRequestWithSession("yonghu", "user1", 1L, "张三"));

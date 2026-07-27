@@ -1,7 +1,7 @@
 package com.service;
 
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
-import com.baomidou.mybatisplus.plugins.Page;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.dao.GongyingshangDao;
 import com.entity.GongyingshangEntity;
 import com.entity.view.GongyingshangView;
@@ -43,7 +43,7 @@ public class GongyingshangServiceImplTest {
         params.put("page", "1");
         params.put("limit", "10");
         Page<GongyingshangEntity> page = new Page<GongyingshangEntity>(1, 10);
-        doReturn(page).when(service).selectPage(any(Page.class), any(EntityWrapper.class));
+        doReturn(page).when(service).selectPage(any(Page.class), any(QueryWrapper.class));
         assertNotNull(service.queryPage(params));
     }
 
@@ -52,34 +52,34 @@ public class GongyingshangServiceImplTest {
         Map<String, Object> params = new HashMap<String, Object>();
         params.put("page", "1");
         params.put("limit", "10");
-        when(gongyingshangDao.selectListView(any(Page.class), any(EntityWrapper.class)))
+        when(gongyingshangDao.selectListView(any(Page.class), any(QueryWrapper.class)))
                 .thenReturn(Collections.<GongyingshangView>emptyList());
-        assertNotNull(service.queryPage(params, new EntityWrapper<GongyingshangEntity>()));
+        assertNotNull(service.queryPage(params, new QueryWrapper<GongyingshangEntity>()));
     }
 
     @Test
     public void selectListVODelegates() {
-        when(gongyingshangDao.selectListVO(any(EntityWrapper.class)))
+        when(gongyingshangDao.selectListVO(any(QueryWrapper.class)))
                 .thenReturn(Collections.<GongyingshangVO>emptyList());
-        assertNotNull(service.selectListVO(new EntityWrapper<GongyingshangEntity>()));
+        assertNotNull(service.selectListVO(new QueryWrapper<GongyingshangEntity>()));
     }
 
     @Test
     public void selectVODelegates() {
-        when(gongyingshangDao.selectVO(any(EntityWrapper.class))).thenReturn(new GongyingshangVO());
-        assertNotNull(service.selectVO(new EntityWrapper<GongyingshangEntity>()));
+        when(gongyingshangDao.selectVO(any(QueryWrapper.class))).thenReturn(new GongyingshangVO());
+        assertNotNull(service.selectVO(new QueryWrapper<GongyingshangEntity>()));
     }
 
     @Test
     public void selectListViewDelegates() {
-        when(gongyingshangDao.selectListView(any(EntityWrapper.class)))
+        when(gongyingshangDao.selectListView(any(QueryWrapper.class)))
                 .thenReturn(Collections.<GongyingshangView>emptyList());
-        assertNotNull(service.selectListView(new EntityWrapper<GongyingshangEntity>()));
+        assertNotNull(service.selectListView(new QueryWrapper<GongyingshangEntity>()));
     }
 
     @Test
     public void selectViewDelegates() {
-        when(gongyingshangDao.selectView(any(EntityWrapper.class))).thenReturn(new GongyingshangView());
-        assertNotNull(service.selectView(new EntityWrapper<GongyingshangEntity>()));
+        when(gongyingshangDao.selectView(any(QueryWrapper.class))).thenReturn(new GongyingshangView());
+        assertNotNull(service.selectView(new QueryWrapper<GongyingshangEntity>()));
     }
 }

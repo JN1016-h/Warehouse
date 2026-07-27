@@ -52,7 +52,7 @@ public class FileControllerTest {
 
     @Test
     public void testUploadWithFaceConfig() throws Exception {
-        when(configService.selectOne(any())).thenReturn(null);
+        when(configService.getOne(any())).thenReturn(null);
         MockMultipartFile file = new MockMultipartFile("file", "face.jpg", "image/jpeg",
                 new byte[]{1, 2, 3});
         R result = controller.upload(file, "1");
@@ -97,7 +97,7 @@ public class FileControllerTest {
         ConfigEntity existing = new ConfigEntity();
         existing.setName("faceFile");
         existing.setValue("old.jpg");
-        when(configService.selectOne(any())).thenReturn(existing);
+        when(configService.getOne(any())).thenReturn(existing);
         MockMultipartFile file = new MockMultipartFile("file", "face.jpg", "image/jpeg",
                 new byte[]{1, 2, 3});
         R result = controller.upload(file, "1");

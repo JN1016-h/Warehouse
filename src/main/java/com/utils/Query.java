@@ -6,7 +6,8 @@ import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 
-import com.baomidou.mybatisplus.plugins.Page;
+import com.baomidou.mybatisplus.core.metadata.OrderItem;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
 /**
  * 查询参数
@@ -46,8 +47,9 @@ public class Query<T> extends LinkedHashMap<String, Object> {
 
         //排序
         if(StringUtils.isNotBlank(sidx) && StringUtils.isNotBlank(order)){
-            this.page.setOrderByField(sidx);
-            this.page.setAsc("ASC".equalsIgnoreCase(order));
+            this.page.addOrder("ASC".equalsIgnoreCase(order)
+                    ? OrderItem.asc(sidx)
+                    : OrderItem.desc(sidx));
         }
     }
     
@@ -78,8 +80,9 @@ public class Query<T> extends LinkedHashMap<String, Object> {
 
         //排序
         if(StringUtils.isNotBlank(sidx) && StringUtils.isNotBlank(order)){
-            this.page.setOrderByField(sidx);
-            this.page.setAsc("ASC".equalsIgnoreCase(order));
+            this.page.addOrder("ASC".equalsIgnoreCase(order)
+                    ? OrderItem.asc(sidx)
+                    : OrderItem.desc(sidx));
         }
 
     }

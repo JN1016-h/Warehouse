@@ -1,11 +1,11 @@
 package com.dao;
 
 import com.entity.BuhuotixingEntity;
-import com.baomidou.mybatisplus.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import java.util.List;
 import java.util.Map;
-import com.baomidou.mybatisplus.mapper.Wrapper;
-import com.baomidou.mybatisplus.plugins.pagination.Pagination;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 
 import org.apache.ibatis.annotations.Param;
 import com.entity.vo.BuhuotixingVO;
@@ -27,7 +27,7 @@ public interface BuhuotixingDao extends BaseMapper<BuhuotixingEntity> {
 	
 	List<BuhuotixingView> selectListView(@Param("ew") Wrapper<BuhuotixingEntity> wrapper);
 
-	List<BuhuotixingView> selectListView(Pagination page,@Param("ew") Wrapper<BuhuotixingEntity> wrapper);
+	List<BuhuotixingView> selectListView(IPage<?> page,@Param("ew") Wrapper<BuhuotixingEntity> wrapper);
 
 	
 	BuhuotixingView selectView(@Param("ew") Wrapper<BuhuotixingEntity> wrapper);

@@ -42,7 +42,7 @@ public class DataScopeResolver {
 
         UserRole role = UserRole.DEALER;
         if (userId != null) {
-            YonghuEntity yonghu = yonghuService.selectById(userId);
+            YonghuEntity yonghu = yonghuService.getById(userId);
             if (yonghu != null && yonghu.getUserRole() != null) {
                 UserRole parsed = UserRole.fromName(yonghu.getUserRole());
                 if (parsed != null) {

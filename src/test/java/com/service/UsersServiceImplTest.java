@@ -1,7 +1,7 @@
 package com.service;
 
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
-import com.baomidou.mybatisplus.plugins.Page;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.dao.UsersDao;
 import com.entity.UsersEntity;
 import com.service.impl.UsersServiceImpl;
@@ -41,7 +41,7 @@ public class UsersServiceImplTest {
         params.put("page", "1");
         params.put("limit", "10");
         Page<UsersEntity> page = new Page<UsersEntity>(1, 10);
-        doReturn(page).when(service).selectPage(any(Page.class), any(EntityWrapper.class));
+        doReturn(page).when(service).selectPage(any(Page.class), any(QueryWrapper.class));
         assertNotNull(service.queryPage(params));
     }
 
@@ -50,15 +50,15 @@ public class UsersServiceImplTest {
         Map<String, Object> params = new HashMap<String, Object>();
         params.put("page", "1");
         params.put("limit", "10");
-        when(usersDao.selectListView(any(Page.class), any(EntityWrapper.class)))
+        when(usersDao.selectListView(any(Page.class), any(QueryWrapper.class)))
                 .thenReturn(Collections.<UsersEntity>emptyList());
-        assertNotNull(service.queryPage(params, new EntityWrapper<UsersEntity>()));
+        assertNotNull(service.queryPage(params, new QueryWrapper<UsersEntity>()));
     }
 
     @Test
     public void selectListViewDelegates() {
-        when(usersDao.selectListView(any(EntityWrapper.class)))
+        when(usersDao.selectListView(any(QueryWrapper.class)))
                 .thenReturn(Collections.<UsersEntity>emptyList());
-        assertNotNull(service.selectListView(new EntityWrapper<UsersEntity>()));
+        assertNotNull(service.selectListView(new QueryWrapper<UsersEntity>()));
     }
 }

@@ -1,7 +1,7 @@
 package com.ai.service;
 
 import com.ai.dto.TimeRange;
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.dao.ChukuxinxiDao;
 import com.dao.DinghuoxinxiDao;
 import com.dao.RukuxinxiDao;
@@ -89,7 +89,7 @@ public class TimeRangeResolver {
 
     private Date latestChuku() {
         List<ChukuxinxiEntity> list = chukuxinxiDao.selectList(
-                new EntityWrapper<ChukuxinxiEntity>().orderBy("jiaohuoshijian", false).last("limit 1"));
+                new QueryWrapper<ChukuxinxiEntity>().orderBy(true, false, "jiaohuoshijian").last("limit 1"));
         if (list == null || list.isEmpty()) {
             return null;
         }
@@ -98,7 +98,7 @@ public class TimeRangeResolver {
 
     private Date latestRuku() {
         List<RukuxinxiEntity> list = rukuxinxiDao.selectList(
-                new EntityWrapper<RukuxinxiEntity>().orderBy("rukushijian", false).last("limit 1"));
+                new QueryWrapper<RukuxinxiEntity>().orderBy(true, false, "rukushijian").last("limit 1"));
         if (list == null || list.isEmpty()) {
             return null;
         }
@@ -107,7 +107,7 @@ public class TimeRangeResolver {
 
     private Date latestDinghuo() {
         List<DinghuoxinxiEntity> list = dinghuoxinxiDao.selectList(
-                new EntityWrapper<DinghuoxinxiEntity>().orderBy("dinghuoshijian", false).last("limit 1"));
+                new QueryWrapper<DinghuoxinxiEntity>().orderBy(true, false, "dinghuoshijian").last("limit 1"));
         if (list == null || list.isEmpty()) {
             return null;
         }

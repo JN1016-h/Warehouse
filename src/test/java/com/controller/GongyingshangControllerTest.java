@@ -62,14 +62,14 @@ public class GongyingshangControllerTest {
 
     @Test
     public void testInfo() {
-        when(gongyingshangService.selectById(1L)).thenReturn(new GongyingshangEntity());
+        when(gongyingshangService.getById(1L)).thenReturn(new GongyingshangEntity());
         R result = controller.info(1L);
         assertEquals(0, result.get("code"));
     }
 
     @Test
     public void testDetail() {
-        when(gongyingshangService.selectById(1L)).thenReturn(new GongyingshangEntity());
+        when(gongyingshangService.getById(1L)).thenReturn(new GongyingshangEntity());
         R result = controller.detail(1L);
         assertEquals(0, result.get("code"));
     }

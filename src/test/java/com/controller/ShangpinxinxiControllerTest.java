@@ -71,14 +71,14 @@ public class ShangpinxinxiControllerTest {
 
     @Test
     public void testInfo() {
-        when(shangpinxinxiService.selectById(1L)).thenReturn(new ShangpinxinxiEntity());
+        when(shangpinxinxiService.getById(1L)).thenReturn(new ShangpinxinxiEntity());
         R result = controller.info(1L);
         assertEquals(0, result.get("code"));
     }
 
     @Test
     public void testDetail() {
-        when(shangpinxinxiService.selectById(1L)).thenReturn(new ShangpinxinxiEntity());
+        when(shangpinxinxiService.getById(1L)).thenReturn(new ShangpinxinxiEntity());
         R result = controller.detail(1L);
         assertEquals(0, result.get("code"));
     }
@@ -155,7 +155,7 @@ public class ShangpinxinxiControllerTest {
 
     @Test
     public void testCount() {
-        when(shangpinxinxiService.selectCount(any())).thenReturn(12);
+        when(shangpinxinxiService.count(any())).thenReturn(12);
         R result = controller.count(ControllerTestSupport.pageParams(), new ShangpinxinxiEntity(),
                 ControllerTestSupport.mockAdminRequest());
         assertEquals(0, result.get("code"));

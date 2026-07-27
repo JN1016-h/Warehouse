@@ -7,7 +7,7 @@ import com.ai.algorithm.TurnoverCalculator;
 import com.ai.config.AiProperties;
 import com.ai.dto.AiIntent;
 import com.ai.dto.TimeRange;
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.dao.ChukuxinxiDao;
 import com.dao.DinghuoxinxiDao;
 import com.dao.RukuxinxiDao;
@@ -70,7 +70,7 @@ public class AnalyticsFacade {
         root.put("end", range.getEnd());
         root.put("note", "以下数字均来自本地业务库聚合，禁止模型编造。");
 
-        List<ShangpinxinxiEntity> products = shangpinxinxiDao.selectList(new EntityWrapper<ShangpinxinxiEntity>());
+        List<ShangpinxinxiEntity> products = shangpinxinxiDao.selectList(new QueryWrapper<ShangpinxinxiEntity>());
         if (products == null) {
             products = Collections.emptyList();
         }
@@ -120,7 +120,7 @@ public class AnalyticsFacade {
     }
 
     private List<ChukuxinxiEntity> queryOutbound(Date start, Date end) {
-        EntityWrapper<ChukuxinxiEntity> ew = new EntityWrapper<ChukuxinxiEntity>();
+        QueryWrapper<ChukuxinxiEntity> ew = new QueryWrapper<ChukuxinxiEntity>();
         if (start != null) {
             ew.ge("jiaohuoshijian", start);
         }
@@ -132,7 +132,7 @@ public class AnalyticsFacade {
     }
 
     private List<RukuxinxiEntity> queryInbound(Date start, Date end) {
-        EntityWrapper<RukuxinxiEntity> ew = new EntityWrapper<RukuxinxiEntity>();
+        QueryWrapper<RukuxinxiEntity> ew = new QueryWrapper<RukuxinxiEntity>();
         if (start != null) {
             ew.ge("rukushijian", start);
         }
@@ -173,7 +173,7 @@ public class AnalyticsFacade {
     private Map<String, Date> lastInboundTime(List<RukuxinxiEntity> list) {
         Map<String, Date> map = new HashMap<String, Date>();
         // also scan all inbound for age if window empty
-        List<RukuxinxiEntity> all = rukuxinxiDao.selectList(new EntityWrapper<RukuxinxiEntity>());
+        List<RukuxinxiEntity> all = rukuxinxiDao.selectList(new QueryWrapper<RukuxinxiEntity>());
         if (all == null) {
             all = list;
         }
@@ -192,7 +192,7 @@ public class AnalyticsFacade {
     private Map<String, Double> latestSalePrice() {
         Map<String, Double> map = new HashMap<String, Double>();
         List<DinghuoxinxiEntity> orders = dinghuoxinxiDao.selectList(
-                new EntityWrapper<DinghuoxinxiEntity>().orderBy("dinghuoshijian", false));
+                new QueryWrapper<DinghuoxinxiEntity>().orderBy(true, false, "dinghuoshijian"));
         if (orders == null) {
             return map;
         }

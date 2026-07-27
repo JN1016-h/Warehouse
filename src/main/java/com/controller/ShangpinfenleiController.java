@@ -26,8 +26,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
-import com.baomidou.mybatisplus.mapper.Wrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.annotation.IgnoreAuth;
 
 import com.entity.ShangpinfenleiEntity;
@@ -70,7 +70,7 @@ public class ShangpinfenleiController {
     @RequestMapping("/page")
     public R page(@RequestParam Map<String, Object> params,ShangpinfenleiEntity shangpinfenlei,
 		HttpServletRequest request){
-        EntityWrapper<ShangpinfenleiEntity> ew = new EntityWrapper<ShangpinfenleiEntity>();
+        QueryWrapper<ShangpinfenleiEntity> ew = new QueryWrapper<ShangpinfenleiEntity>();
 
 
 
@@ -87,7 +87,7 @@ public class ShangpinfenleiController {
     @RequestMapping("/list")
     public R list(@RequestParam Map<String, Object> params,ShangpinfenleiEntity shangpinfenlei, 
 		HttpServletRequest request){
-        EntityWrapper<ShangpinfenleiEntity> ew = new EntityWrapper<ShangpinfenleiEntity>();
+        QueryWrapper<ShangpinfenleiEntity> ew = new QueryWrapper<ShangpinfenleiEntity>();
 
 		PageUtils page = shangpinfenleiService.queryPage(params, MPUtil.sort(MPUtil.between(MPUtil.likeOrEq(ew, shangpinfenlei), params), params));
 		
@@ -103,7 +103,7 @@ public class ShangpinfenleiController {
      */
     @RequestMapping("/lists")
     public R list( ShangpinfenleiEntity shangpinfenlei){
-       	EntityWrapper<ShangpinfenleiEntity> ew = new EntityWrapper<ShangpinfenleiEntity>();
+       	QueryWrapper<ShangpinfenleiEntity> ew = new QueryWrapper<ShangpinfenleiEntity>();
       	ew.allEq(MPUtil.allEQMapPre( shangpinfenlei, "shangpinfenlei")); 
         return R.ok().put("data", shangpinfenleiService.selectListView(ew));
     }
@@ -113,7 +113,7 @@ public class ShangpinfenleiController {
      */
     @RequestMapping("/query")
     public R query(ShangpinfenleiEntity shangpinfenlei){
-        EntityWrapper< ShangpinfenleiEntity> ew = new EntityWrapper< ShangpinfenleiEntity>();
+        QueryWrapper< ShangpinfenleiEntity> ew = new QueryWrapper< ShangpinfenleiEntity>();
  		ew.allEq(MPUtil.allEQMapPre( shangpinfenlei, "shangpinfenlei")); 
 		ShangpinfenleiView shangpinfenleiView =  shangpinfenleiService.selectView(ew);
 		return R.ok("查询商品分类成功").put("data", shangpinfenleiView);
@@ -124,7 +124,7 @@ public class ShangpinfenleiController {
      */
     @RequestMapping("/info/{id}")
     public R info(@PathVariable("id") Long id){
-        ShangpinfenleiEntity shangpinfenlei = shangpinfenleiService.selectById(id);
+        ShangpinfenleiEntity shangpinfenlei = shangpinfenleiService.getById(id);
 				Map<String, String> deSens = new HashMap<>();
 				DeSensUtil.desensitize(shangpinfenlei,deSens);
         return R.ok().put("data", shangpinfenlei);
@@ -136,7 +136,7 @@ public class ShangpinfenleiController {
 	@IgnoreAuth
     @RequestMapping("/detail/{id}")
     public R detail(@PathVariable("id") Long id){
-        ShangpinfenleiEntity shangpinfenlei = shangpinfenleiService.selectById(id);
+        ShangpinfenleiEntity shangpinfenlei = shangpinfenleiService.getById(id);
 				Map<String, String> deSens = new HashMap<>();
 				DeSensUtil.desensitize(shangpinfenlei,deSens);
         return R.ok().put("data", shangpinfenlei);
@@ -151,7 +151,7 @@ public class ShangpinfenleiController {
     @RequestMapping("/save")
     public R save(@RequestBody ShangpinfenleiEntity shangpinfenlei, HttpServletRequest request){
     	//ValidatorUtils.validateEntity(shangpinfenlei);
-        shangpinfenleiService.insert(shangpinfenlei);
+        shangpinfenleiService.save(shangpinfenlei);
         return R.ok();
     }
     
@@ -161,7 +161,7 @@ public class ShangpinfenleiController {
     @RequestMapping("/add")
     public R add(@RequestBody ShangpinfenleiEntity shangpinfenlei, HttpServletRequest request){
     	//ValidatorUtils.validateEntity(shangpinfenlei);
-        shangpinfenleiService.insert(shangpinfenlei);
+        shangpinfenleiService.save(shangpinfenlei);
         return R.ok().put("data",shangpinfenlei.getId());
     }
 
@@ -191,7 +191,7 @@ public class ShangpinfenleiController {
      */
     @RequestMapping("/delete")
     public R delete(@RequestBody Long[] ids){
-        shangpinfenleiService.deleteBatchIds(Arrays.asList(ids));
+        shangpinfenleiService.removeByIds(Arrays.asList(ids));
         return R.ok();
     }
     

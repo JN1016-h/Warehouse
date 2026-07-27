@@ -4,10 +4,10 @@ import org.springframework.stereotype.Service;
 import java.util.Map;
 import java.util.List;
 
-import com.baomidou.mybatisplus.mapper.Wrapper;
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
-import com.baomidou.mybatisplus.plugins.Page;
-import com.baomidou.mybatisplus.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.utils.PageUtils;
 import com.utils.Query;
 
@@ -24,9 +24,9 @@ public class ChukuxinxiServiceImpl extends ServiceImpl<ChukuxinxiDao, Chukuxinxi
 	
     @Override
     public PageUtils queryPage(Map<String, Object> params) {
-        Page<ChukuxinxiEntity> page = this.selectPage(
+        Page<ChukuxinxiEntity> page = this.page(
                 new Query<ChukuxinxiEntity>(params).getPage(),
-                new EntityWrapper<ChukuxinxiEntity>()
+                new QueryWrapper<ChukuxinxiEntity>()
         );
         return new PageUtils(page);
     }

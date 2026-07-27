@@ -50,7 +50,7 @@ public class UserServiceTest {
         yonghuEntity.setAddtime(new Date());
         
         // 模拟YonghuService行为
-        when(yonghuService.selectById(userId)).thenReturn(yonghuEntity);
+        when(yonghuService.getById(userId)).thenReturn(yonghuEntity);
         
         // 执行测试
         UserDTO result = userService.getUserInfo(userId);
@@ -79,7 +79,7 @@ public class UserServiceTest {
         Long userId = 999L;
         
         // 模拟YonghuService行为
-        when(yonghuService.selectById(userId)).thenReturn(null);
+        when(yonghuService.getById(userId)).thenReturn(null);
         
         // 执行测试
         UserDTO result = userService.getUserInfo(userId);
@@ -124,7 +124,7 @@ public class UserServiceTest {
         yonghuEntity.setAddtime(new Date());
         
         // 模拟YonghuService行为
-        when(yonghuService.selectById(userId)).thenReturn(yonghuEntity);
+        when(yonghuService.getById(userId)).thenReturn(yonghuEntity);
         
         // 执行测试
         UserDTO result = userService.getUserInfo(userId);
@@ -149,7 +149,7 @@ public class UserServiceTest {
         yonghuEntity.setUserRole("DEALER");
         
         // 模拟YonghuService行为
-        when(yonghuService.selectById(userId)).thenReturn(yonghuEntity);
+        when(yonghuService.getById(userId)).thenReturn(yonghuEntity);
         when(yonghuService.updateById(any(YonghuEntity.class))).thenReturn(true);
         
         // 执行测试
@@ -175,7 +175,7 @@ public class UserServiceTest {
         UserRole newRole = UserRole.INTERNAL_STAFF;
         
         // 模拟YonghuService行为
-        when(yonghuService.selectById(userId)).thenReturn(null);
+        when(yonghuService.getById(userId)).thenReturn(null);
         
         // 执行测试
         boolean result = userService.updateUserRole(userId, newRole);
@@ -278,7 +278,7 @@ public class UserServiceTest {
         yonghuEntity.setUserRole(roleStr);
         yonghuEntity.setAddtime(new Date());
         
-        when(yonghuService.selectById(userId)).thenReturn(yonghuEntity);
+        when(yonghuService.getById(userId)).thenReturn(yonghuEntity);
         
         UserDTO result = userService.getUserInfo(userId);
         

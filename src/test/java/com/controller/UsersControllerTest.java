@@ -46,7 +46,7 @@ public class UsersControllerTest {
         user.setUsername("admin");
         user.setPassword(EncryptUtil.md5("123456"));
         user.setRole("管理员");
-        when(userService.selectOne(any())).thenReturn(user);
+        when(userService.getOne(any())).thenReturn(user);
         when(tokenService.generateToken(anyLong(), anyString(), anyString(), anyString())).thenReturn("token");
 
         R result = controller.login("admin", "123456", null, null, ControllerTestSupport.mockAdminRequest());
@@ -62,14 +62,14 @@ public class UsersControllerTest {
 
     @Test
     public void testRegister() {
-        when(userService.selectOne(any())).thenReturn(null);
+        when(userService.getOne(any())).thenReturn(null);
         R result = controller.register(new UsersEntity());
         assertEquals(0, result.get("code"));
     }
 
     @Test
     public void testRegisterDuplicate() {
-        when(userService.selectOne(any())).thenReturn(new UsersEntity());
+        when(userService.getOne(any())).thenReturn(new UsersEntity());
         R result = controller.register(new UsersEntity());
         assertEquals(500, result.get("code"));
     }
@@ -84,14 +84,14 @@ public class UsersControllerTest {
     public void testResetPass() {
         UsersEntity user = new UsersEntity();
         user.setId(1L);
-        when(userService.selectOne(any())).thenReturn(user);
+        when(userService.getOne(any())).thenReturn(user);
         R result = controller.resetPass("admin", ControllerTestSupport.mockAdminRequest());
         assertEquals(0, result.get("code"));
     }
 
     @Test
     public void testResetPassNotFound() {
-        when(userService.selectOne(any())).thenReturn(null);
+        when(userService.getOne(any())).thenReturn(null);
         R result = controller.resetPass("missing", ControllerTestSupport.mockAdminRequest());
         assertEquals(500, result.get("code"));
     }
@@ -112,14 +112,14 @@ public class UsersControllerTest {
 
     @Test
     public void testInfo() {
-        when(userService.selectById("1")).thenReturn(new UsersEntity());
+        when(userService.getById("1")).thenReturn(new UsersEntity());
         R result = controller.info("1");
         assertEquals(0, result.get("code"));
     }
 
     @Test
     public void testSession() {
-        when(userService.selectById(1L)).thenReturn(new UsersEntity());
+        when(userService.getById(1L)).thenReturn(new UsersEntity());
         R result = controller.getCurrUser(ControllerTestSupport.mockAdminRequest());
         assertEquals(0, result.get("code"));
     }
@@ -136,7 +136,7 @@ public class UsersControllerTest {
 
     @Test
     public void testSave() {
-        when(userService.selectOne(any())).thenReturn(null);
+        when(userService.getOne(any())).thenReturn(null);
         R result = controller.save(new UsersEntity());
         assertEquals(0, result.get("code"));
     }
@@ -146,7 +146,7 @@ public class UsersControllerTest {
         UsersEntity user = new UsersEntity();
         user.setId(1L);
         user.setUsername("admin");
-        when(userService.selectOne(any())).thenReturn(null);
+        when(userService.getOne(any())).thenReturn(null);
         R result = controller.update(user);
         assertEquals(0, result.get("code"));
     }
@@ -161,7 +161,7 @@ public class UsersControllerTest {
     public void testLoginWrongPassword() {
         UsersEntity user = new UsersEntity();
         user.setPassword(EncryptUtil.md5("correct"));
-        when(userService.selectOne(any())).thenReturn(user);
+        when(userService.getOne(any())).thenReturn(user);
 
         R result = controller.login("admin", "wrong", null, null, ControllerTestSupport.mockAdminRequest());
         assertEquals(500, result.get("code"));
@@ -169,7 +169,7 @@ public class UsersControllerTest {
 
     @Test
     public void testLoginUserNotFound() {
-        when(userService.selectOne(any())).thenReturn(null);
+        when(userService.getOne(any())).thenReturn(null);
         R result = controller.login("ghost", "pass", null, null, ControllerTestSupport.mockAdminRequest());
         assertEquals(500, result.get("code"));
     }
@@ -178,7 +178,7 @@ public class UsersControllerTest {
     public void testSaveDuplicateUsername() {
         UsersEntity entity = new UsersEntity();
         entity.setUsername("dup");
-        when(userService.selectOne(any())).thenReturn(new UsersEntity());
+        when(userService.getOne(any())).thenReturn(new UsersEntity());
         R result = controller.save(entity);
         assertEquals(500, result.get("code"));
     }
@@ -191,7 +191,7 @@ public class UsersControllerTest {
         UsersEntity user = new UsersEntity();
         user.setId(1L);
         user.setUsername("taken");
-        when(userService.selectOne(any())).thenReturn(existing);
+        when(userService.getOne(any())).thenReturn(existing);
         R result = controller.update(user);
         assertEquals(500, result.get("code"));
     }
@@ -203,7 +203,7 @@ public class UsersControllerTest {
         user.setUsername("legacy");
         user.setPassword("plainpass");
         user.setRole("管理员");
-        when(userService.selectOne(any())).thenReturn(user);
+        when(userService.getOne(any())).thenReturn(user);
         when(tokenService.generateToken(anyLong(), anyString(), anyString(), anyString())).thenReturn("token");
 
         R result = controller.login("legacy", "plainpass", null, null, ControllerTestSupport.mockAdminRequest());
@@ -215,7 +215,7 @@ public class UsersControllerTest {
         UsersEntity user = new UsersEntity();
         user.setUsername("newadmin");
         user.setPassword("secret");
-        when(userService.selectOne(any())).thenReturn(null);
+        when(userService.getOne(any())).thenReturn(null);
 
         R result = controller.register(user);
         assertEquals(0, result.get("code"));
@@ -225,7 +225,7 @@ public class UsersControllerTest {
     public void testRegisterWithoutPassword() {
         UsersEntity user = new UsersEntity();
         user.setUsername("nopass");
-        when(userService.selectOne(any())).thenReturn(null);
+        when(userService.getOne(any())).thenReturn(null);
 
         R result = controller.register(user);
         assertEquals(0, result.get("code"));
@@ -238,7 +238,7 @@ public class UsersControllerTest {
         user.setUsername("admin2");
         user.setPassword(EncryptUtil.md5("123456"));
         user.setRole("管理员");
-        when(userService.selectOne(any())).thenReturn(user);
+        when(userService.getOne(any())).thenReturn(user);
         when(tokenService.generateToken(anyLong(), anyString(), anyString(), anyString())).thenReturn("token");
 
         com.dto.LoginRequest body = new com.dto.LoginRequest();
@@ -266,7 +266,7 @@ public class UsersControllerTest {
         UsersEntity user = new UsersEntity();
         user.setUsername("admin");
         user.setPassword(EncryptUtil.md5("correct"));
-        when(userService.selectOne(any())).thenReturn(user);
+        when(userService.getOne(any())).thenReturn(user);
 
         R result = controller.login("admin", "wrong", null, null, ControllerTestSupport.mockAdminRequest());
         assertEquals(500, result.get("code"));
@@ -277,7 +277,7 @@ public class UsersControllerTest {
         UsersEntity user = new UsersEntity();
         user.setUsername("ghost");
         user.setPassword(null);
-        when(userService.selectOne(any())).thenReturn(user);
+        when(userService.getOne(any())).thenReturn(user);
 
         R result = controller.login("ghost", "pass", null, null, ControllerTestSupport.mockAdminRequest());
         assertEquals(500, result.get("code"));
@@ -288,7 +288,7 @@ public class UsersControllerTest {
         UsersEntity entity = new UsersEntity();
         entity.setUsername("nopass");
         entity.setPassword(null);
-        when(userService.selectOne(any())).thenReturn(null);
+        when(userService.getOne(any())).thenReturn(null);
 
         R result = controller.save(entity);
         assertEquals(0, result.get("code"));
@@ -299,7 +299,7 @@ public class UsersControllerTest {
         UsersEntity entity = new UsersEntity();
         entity.setUsername("empty");
         entity.setPassword("");
-        when(userService.selectOne(any())).thenReturn(null);
+        when(userService.getOne(any())).thenReturn(null);
 
         R result = controller.save(entity);
         assertEquals(0, result.get("code"));
@@ -313,7 +313,7 @@ public class UsersControllerTest {
         UsersEntity existing = new UsersEntity();
         existing.setId(1L);
         existing.setUsername("self");
-        when(userService.selectOne(any())).thenReturn(existing);
+        when(userService.getOne(any())).thenReturn(existing);
 
         R result = controller.update(user);
         assertEquals(0, result.get("code"));
@@ -324,7 +324,7 @@ public class UsersControllerTest {
         UsersEntity user = new UsersEntity();
         user.setId(1L);
         user.setUsername("unique");
-        when(userService.selectOne(any())).thenReturn(null);
+        when(userService.getOne(any())).thenReturn(null);
 
         R result = controller.update(user);
         assertEquals(0, result.get("code"));

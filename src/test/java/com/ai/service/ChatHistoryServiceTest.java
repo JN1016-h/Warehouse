@@ -4,7 +4,7 @@ import com.ai.dao.AiChatMessageDao;
 import com.ai.dao.AiChatSessionDao;
 import com.ai.entity.AiChatMessageEntity;
 import com.ai.entity.AiChatSessionEntity;
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -102,7 +102,7 @@ public class ChatHistoryServiceTest {
 
     @Test
     public void listSessionsReturnsList() {
-        when(sessionDao.selectList(any(EntityWrapper.class)))
+        when(sessionDao.selectList(any(QueryWrapper.class)))
                 .thenReturn(Arrays.asList(new AiChatSessionEntity()));
 
         List<AiChatSessionEntity> list = chatHistoryService.listSessions(1L);
@@ -122,7 +122,7 @@ public class ChatHistoryServiceTest {
         AiChatSessionEntity session = new AiChatSessionEntity();
         session.setUserId(2L);
         when(sessionDao.selectById(1L)).thenReturn(session);
-        when(messageDao.selectList(any(EntityWrapper.class)))
+        when(messageDao.selectList(any(QueryWrapper.class)))
                 .thenReturn(Arrays.asList(new AiChatMessageEntity()));
 
         assertEquals(1, chatHistoryService.listMessages(1L, 2L).size());
@@ -206,7 +206,7 @@ public class ChatHistoryServiceTest {
 
     @Test
     public void listSessionsNullListFromDao() {
-        when(sessionDao.selectList(any(EntityWrapper.class))).thenReturn(null);
+        when(sessionDao.selectList(any(QueryWrapper.class))).thenReturn(null);
         assertTrue(chatHistoryService.listSessions(1L).isEmpty());
     }
 
@@ -224,7 +224,7 @@ public class ChatHistoryServiceTest {
         AiChatSessionEntity session = new AiChatSessionEntity();
         session.setUserId(2L);
         when(sessionDao.selectById(1L)).thenReturn(session);
-        when(messageDao.selectList(any(EntityWrapper.class))).thenReturn(null);
+        when(messageDao.selectList(any(QueryWrapper.class))).thenReturn(null);
 
         assertTrue(chatHistoryService.listMessages(1L, 2L).isEmpty());
     }

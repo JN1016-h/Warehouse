@@ -1,6 +1,6 @@
 package com.service;
 
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.dao.TokenDao;
 import com.entity.TokenEntity;
 import com.service.impl.TokenServiceImpl;
@@ -42,7 +42,7 @@ public class TokenServiceImplTest {
         existing.setId(1L);
         existing.setUserid(10L);
         existing.setRole("管理员");
-        doReturn(existing).when(tokenService).selectOne(any(EntityWrapper.class));
+        doReturn(existing).when(tokenService).selectOne(any(QueryWrapper.class));
         doReturn(true).when(tokenService).updateById(any(TokenEntity.class));
 
         String token = tokenService.generateToken(10L, "user1", "yonghu", "管理员");
@@ -57,7 +57,7 @@ public class TokenServiceImplTest {
 
     @Test
     public void generateTokenInsertsNew() {
-        doReturn(null).when(tokenService).selectOne(any(EntityWrapper.class));
+        doReturn(null).when(tokenService).selectOne(any(QueryWrapper.class));
         doReturn(true).when(tokenService).insert(any(TokenEntity.class));
 
         String token = tokenService.generateToken(20L, "newuser", "yonghu", "用户");
@@ -77,7 +77,7 @@ public class TokenServiceImplTest {
         Calendar cal = Calendar.getInstance();
         cal.add(Calendar.HOUR, 1);
         TokenEntity entity = new TokenEntity(1L, "u", "yonghu", "管理员", "abc", cal.getTime());
-        doReturn(entity).when(tokenService).selectOne(any(EntityWrapper.class));
+        doReturn(entity).when(tokenService).selectOne(any(QueryWrapper.class));
 
         TokenEntity result = tokenService.getTokenEntity("abc");
 
@@ -89,14 +89,14 @@ public class TokenServiceImplTest {
         Calendar cal = Calendar.getInstance();
         cal.add(Calendar.HOUR, -1);
         TokenEntity entity = new TokenEntity(1L, "u", "yonghu", "管理员", "expired", cal.getTime());
-        doReturn(entity).when(tokenService).selectOne(any(EntityWrapper.class));
+        doReturn(entity).when(tokenService).selectOne(any(QueryWrapper.class));
 
         assertNull(tokenService.getTokenEntity("expired"));
     }
 
     @Test
     public void getTokenEntityNotFound() {
-        doReturn(null).when(tokenService).selectOne(any(EntityWrapper.class));
+        doReturn(null).when(tokenService).selectOne(any(QueryWrapper.class));
         assertNull(tokenService.getTokenEntity("missing"));
     }
 
@@ -107,13 +107,13 @@ public class TokenServiceImplTest {
         params.put("limit", "10");
         when(tokenDao.selectListView(any(), any())).thenReturn(Collections.<TokenEntity>emptyList());
 
-        assertNotNull(tokenService.queryPage(params, new EntityWrapper<TokenEntity>()));
+        assertNotNull(tokenService.queryPage(params, new QueryWrapper<TokenEntity>()));
     }
 
     @Test
     public void selectListViewDelegates() {
-        when(tokenDao.selectListView(any(EntityWrapper.class))).thenReturn(Collections.<TokenEntity>emptyList());
+        when(tokenDao.selectListView(any(QueryWrapper.class))).thenReturn(Collections.<TokenEntity>emptyList());
 
-        assertNotNull(tokenService.selectListView(new EntityWrapper<TokenEntity>()));
+        assertNotNull(tokenService.selectListView(new QueryWrapper<TokenEntity>()));
     }
 }

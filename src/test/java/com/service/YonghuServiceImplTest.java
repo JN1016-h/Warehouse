@@ -1,7 +1,7 @@
 package com.service;
 
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
-import com.baomidou.mybatisplus.plugins.Page;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.dao.YonghuDao;
 import com.entity.YonghuEntity;
 import com.entity.view.YonghuView;
@@ -43,7 +43,7 @@ public class YonghuServiceImplTest {
         params.put("page", "1");
         params.put("limit", "10");
         Page<YonghuEntity> page = new Page<YonghuEntity>(1, 10);
-        doReturn(page).when(service).selectPage(any(Page.class), any(EntityWrapper.class));
+        doReturn(page).when(service).selectPage(any(Page.class), any(QueryWrapper.class));
         assertNotNull(service.queryPage(params));
     }
 
@@ -52,34 +52,34 @@ public class YonghuServiceImplTest {
         Map<String, Object> params = new HashMap<String, Object>();
         params.put("page", "1");
         params.put("limit", "10");
-        when(yonghuDao.selectListView(any(Page.class), any(EntityWrapper.class)))
+        when(yonghuDao.selectListView(any(Page.class), any(QueryWrapper.class)))
                 .thenReturn(Collections.<YonghuView>emptyList());
-        assertNotNull(service.queryPage(params, new EntityWrapper<YonghuEntity>()));
+        assertNotNull(service.queryPage(params, new QueryWrapper<YonghuEntity>()));
     }
 
     @Test
     public void selectListVODelegates() {
-        when(yonghuDao.selectListVO(any(EntityWrapper.class)))
+        when(yonghuDao.selectListVO(any(QueryWrapper.class)))
                 .thenReturn(Collections.<YonghuVO>emptyList());
-        assertNotNull(service.selectListVO(new EntityWrapper<YonghuEntity>()));
+        assertNotNull(service.selectListVO(new QueryWrapper<YonghuEntity>()));
     }
 
     @Test
     public void selectVODelegates() {
-        when(yonghuDao.selectVO(any(EntityWrapper.class))).thenReturn(new YonghuVO());
-        assertNotNull(service.selectVO(new EntityWrapper<YonghuEntity>()));
+        when(yonghuDao.selectVO(any(QueryWrapper.class))).thenReturn(new YonghuVO());
+        assertNotNull(service.selectVO(new QueryWrapper<YonghuEntity>()));
     }
 
     @Test
     public void selectListViewDelegates() {
-        when(yonghuDao.selectListView(any(EntityWrapper.class)))
+        when(yonghuDao.selectListView(any(QueryWrapper.class)))
                 .thenReturn(Collections.<YonghuView>emptyList());
-        assertNotNull(service.selectListView(new EntityWrapper<YonghuEntity>()));
+        assertNotNull(service.selectListView(new QueryWrapper<YonghuEntity>()));
     }
 
     @Test
     public void selectViewDelegates() {
-        when(yonghuDao.selectView(any(EntityWrapper.class))).thenReturn(new YonghuView());
-        assertNotNull(service.selectView(new EntityWrapper<YonghuEntity>()));
+        when(yonghuDao.selectView(any(QueryWrapper.class))).thenReturn(new YonghuView());
+        assertNotNull(service.selectView(new QueryWrapper<YonghuEntity>()));
     }
 }

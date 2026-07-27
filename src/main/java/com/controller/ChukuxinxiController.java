@@ -26,8 +26,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
-import com.baomidou.mybatisplus.mapper.Wrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.annotation.IgnoreAuth;
 
 import com.entity.ChukuxinxiEntity;
@@ -85,7 +85,7 @@ public class ChukuxinxiController {
 			String username = (String)request.getSession().getAttribute("username");
 			chukuxinxi.setZhanghao(username);
 		}
-        EntityWrapper<ChukuxinxiEntity> ew = new EntityWrapper<ChukuxinxiEntity>();
+        QueryWrapper<ChukuxinxiEntity> ew = new QueryWrapper<ChukuxinxiEntity>();
 
 
 
@@ -102,7 +102,7 @@ public class ChukuxinxiController {
     @RequestMapping("/list")
     public R list(@RequestParam Map<String, Object> params,ChukuxinxiEntity chukuxinxi, 
 		HttpServletRequest request){
-        EntityWrapper<ChukuxinxiEntity> ew = new EntityWrapper<ChukuxinxiEntity>();
+        QueryWrapper<ChukuxinxiEntity> ew = new QueryWrapper<ChukuxinxiEntity>();
 
 		PageUtils page = chukuxinxiService.queryPage(params, MPUtil.sort(MPUtil.between(MPUtil.likeOrEq(ew, chukuxinxi), params), params));
 		
@@ -118,7 +118,7 @@ public class ChukuxinxiController {
      */
     @RequestMapping("/lists")
     public R list( ChukuxinxiEntity chukuxinxi){
-       	EntityWrapper<ChukuxinxiEntity> ew = new EntityWrapper<ChukuxinxiEntity>();
+       	QueryWrapper<ChukuxinxiEntity> ew = new QueryWrapper<ChukuxinxiEntity>();
       	ew.allEq(MPUtil.allEQMapPre( chukuxinxi, "chukuxinxi")); 
         return R.ok().put("data", chukuxinxiService.selectListView(ew));
     }
@@ -128,7 +128,7 @@ public class ChukuxinxiController {
      */
     @RequestMapping("/query")
     public R query(ChukuxinxiEntity chukuxinxi){
-        EntityWrapper< ChukuxinxiEntity> ew = new EntityWrapper< ChukuxinxiEntity>();
+        QueryWrapper< ChukuxinxiEntity> ew = new QueryWrapper< ChukuxinxiEntity>();
  		ew.allEq(MPUtil.allEQMapPre( chukuxinxi, "chukuxinxi")); 
 		ChukuxinxiView chukuxinxiView =  chukuxinxiService.selectView(ew);
 		return R.ok("查询出库信息成功").put("data", chukuxinxiView);
@@ -139,7 +139,7 @@ public class ChukuxinxiController {
      */
     @RequestMapping("/info/{id}")
     public R info(@PathVariable("id") Long id){
-        ChukuxinxiEntity chukuxinxi = chukuxinxiService.selectById(id);
+        ChukuxinxiEntity chukuxinxi = chukuxinxiService.getById(id);
 				Map<String, String> deSens = new HashMap<>();
 				DeSensUtil.desensitize(chukuxinxi,deSens);
         return R.ok().put("data", chukuxinxi);
@@ -151,7 +151,7 @@ public class ChukuxinxiController {
 	@IgnoreAuth
     @RequestMapping("/detail/{id}")
     public R detail(@PathVariable("id") Long id){
-        ChukuxinxiEntity chukuxinxi = chukuxinxiService.selectById(id);
+        ChukuxinxiEntity chukuxinxi = chukuxinxiService.getById(id);
 				Map<String, String> deSens = new HashMap<>();
 				DeSensUtil.desensitize(chukuxinxi,deSens);
         return R.ok().put("data", chukuxinxi);
@@ -177,13 +177,13 @@ public class ChukuxinxiController {
     		chukuxinxi.setXingming(xingming);
     	}
     	
-        chukuxinxiService.insert(chukuxinxi);
+        chukuxinxiService.save(chukuxinxi);
         
         // 更新商品库存（出库减少库存）
         if(chukuxinxi.getFuzhuangbianhao() != null && chukuxinxi.getFuzhuangkucun() != null) {
-            EntityWrapper<ShangpinxinxiEntity> wrapper = new EntityWrapper<>();
+            QueryWrapper<ShangpinxinxiEntity> wrapper = new QueryWrapper<>();
             wrapper.eq("fuzhuangbianhao", chukuxinxi.getFuzhuangbianhao());
-            ShangpinxinxiEntity product = shangpinxinxiService.selectOne(wrapper);
+            ShangpinxinxiEntity product = shangpinxinxiService.getOne(wrapper);
             if(product != null) {
                 Integer currentStock = product.getFuzhuangkucun() != null ? product.getFuzhuangkucun() : 0;
                 product.setFuzhuangkucun(currentStock - chukuxinxi.getFuzhuangkucun());
@@ -206,7 +206,7 @@ public class ChukuxinxiController {
     @RequestMapping("/add")
     public R add(@RequestBody ChukuxinxiEntity chukuxinxi, HttpServletRequest request){
     	//ValidatorUtils.validateEntity(chukuxinxi);
-        chukuxinxiService.insert(chukuxinxi);
+        chukuxinxiService.save(chukuxinxi);
         return R.ok().put("data",chukuxinxi.getId());
     }
 
@@ -236,7 +236,7 @@ public class ChukuxinxiController {
      */
     @RequestMapping("/delete")
     public R delete(@RequestBody Long[] ids){
-        chukuxinxiService.deleteBatchIds(Arrays.asList(ids));
+        chukuxinxiService.removeByIds(Arrays.asList(ids));
         return R.ok();
     }
     

@@ -63,14 +63,14 @@ public class ShangpinfenleiControllerTest {
 
     @Test
     public void testInfo() {
-        when(shangpinfenleiService.selectById(1L)).thenReturn(new ShangpinfenleiEntity());
+        when(shangpinfenleiService.getById(1L)).thenReturn(new ShangpinfenleiEntity());
         R result = controller.info(1L);
         assertEquals(0, result.get("code"));
     }
 
     @Test
     public void testDetail() {
-        when(shangpinfenleiService.selectById(1L)).thenReturn(new ShangpinfenleiEntity());
+        when(shangpinfenleiService.getById(1L)).thenReturn(new ShangpinfenleiEntity());
         R result = controller.detail(1L);
         assertEquals(0, result.get("code"));
     }

@@ -27,8 +27,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
-import com.baomidou.mybatisplus.mapper.Wrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.annotation.IgnoreAuth;
 
 import com.entity.YonghuEntity;
@@ -100,7 +100,7 @@ public class YonghuController {
 			log.warn("Yonghu login: blank username or password");
 			return R.error("账号或密码不正确");
 		}
-		YonghuEntity u = yonghuService.selectOne(new EntityWrapper<YonghuEntity>().eq("yonghuzhanghao", username));
+		YonghuEntity u = yonghuService.getOne(new QueryWrapper<YonghuEntity>().eq("yonghuzhanghao", username));
 		if (u == null) {
 			log.warn("Yonghu login: account not found, username='{}'", username);
 			return R.error("账号或密码不正确");
@@ -141,7 +141,7 @@ public class YonghuController {
 		if (yonghu.getYonghuxingming() != null) {
 			yonghu.setYonghuxingming(yonghu.getYonghuxingming().trim());
 		}
-    	YonghuEntity u = yonghuService.selectOne(new EntityWrapper<YonghuEntity>().eq("yonghuzhanghao", yonghu.getYonghuzhanghao()));
+    	YonghuEntity u = yonghuService.getOne(new QueryWrapper<YonghuEntity>().eq("yonghuzhanghao", yonghu.getYonghuzhanghao()));
 		if(u!=null) {
 			return R.error("注册用户已存在");
 		}
@@ -149,7 +149,7 @@ public class YonghuController {
 		yonghu.setId(uId);
 		yonghu.setMima(EncryptUtil.md5(yonghu.getMima()));
 		try {
-			yonghuService.insert(yonghu);
+			yonghuService.save(yonghu);
 		} catch (Exception e) {
 			log.error("Yonghu register insert failed, username='{}'", yonghu.getYonghuzhanghao(), e);
 			return R.error("注册失败，请稍后重试或联系管理员");
@@ -176,7 +176,7 @@ public class YonghuController {
     	if (id == null) {
     		return R.error(401, "请先登录");
     	}
-        YonghuEntity u = yonghuService.selectById(id);
+        YonghuEntity u = yonghuService.getById(id);
         return R.ok().put("data", u);
     }
     
@@ -185,7 +185,7 @@ public class YonghuController {
      */
 	@RequestMapping(value = "/resetPass")
     public R resetPass(String username, HttpServletRequest request){
-    	YonghuEntity u = yonghuService.selectOne(new EntityWrapper<YonghuEntity>().eq("yonghuzhanghao", username));
+    	YonghuEntity u = yonghuService.getOne(new QueryWrapper<YonghuEntity>().eq("yonghuzhanghao", username));
     	if(u==null) {
     		return R.error("账号不存在");
     	}
@@ -202,7 +202,7 @@ public class YonghuController {
     @RequestMapping("/page")
     public R page(@RequestParam Map<String, Object> params,YonghuEntity yonghu,
 		HttpServletRequest request){
-        EntityWrapper<YonghuEntity> ew = new EntityWrapper<YonghuEntity>();
+        QueryWrapper<YonghuEntity> ew = new QueryWrapper<YonghuEntity>();
 
 
 
@@ -219,7 +219,7 @@ public class YonghuController {
     @RequestMapping("/list")
     public R list(@RequestParam Map<String, Object> params,YonghuEntity yonghu, 
 		HttpServletRequest request){
-        EntityWrapper<YonghuEntity> ew = new EntityWrapper<YonghuEntity>();
+        QueryWrapper<YonghuEntity> ew = new QueryWrapper<YonghuEntity>();
 
 		PageUtils page = yonghuService.queryPage(params, MPUtil.sort(MPUtil.between(MPUtil.likeOrEq(ew, yonghu), params), params));
 		
@@ -235,7 +235,7 @@ public class YonghuController {
      */
     @RequestMapping("/lists")
     public R list( YonghuEntity yonghu){
-       	EntityWrapper<YonghuEntity> ew = new EntityWrapper<YonghuEntity>();
+       	QueryWrapper<YonghuEntity> ew = new QueryWrapper<YonghuEntity>();
       	ew.allEq(MPUtil.allEQMapPre( yonghu, "yonghu")); 
         return R.ok().put("data", yonghuService.selectListView(ew));
     }
@@ -245,7 +245,7 @@ public class YonghuController {
      */
     @RequestMapping("/query")
     public R query(YonghuEntity yonghu){
-        EntityWrapper< YonghuEntity> ew = new EntityWrapper< YonghuEntity>();
+        QueryWrapper< YonghuEntity> ew = new QueryWrapper< YonghuEntity>();
  		ew.allEq(MPUtil.allEQMapPre( yonghu, "yonghu")); 
 		YonghuView yonghuView =  yonghuService.selectView(ew);
 		return R.ok("查询用户成功").put("data", yonghuView);
@@ -256,7 +256,7 @@ public class YonghuController {
      */
     @RequestMapping("/info/{id}")
     public R info(@PathVariable("id") Long id){
-        YonghuEntity yonghu = yonghuService.selectById(id);
+        YonghuEntity yonghu = yonghuService.getById(id);
 				Map<String, String> deSens = new HashMap<>();
 				DeSensUtil.desensitize(yonghu,deSens);
         return R.ok().put("data", yonghu);
@@ -268,7 +268,7 @@ public class YonghuController {
 	@IgnoreAuth
     @RequestMapping("/detail/{id}")
     public R detail(@PathVariable("id") Long id){
-        YonghuEntity yonghu = yonghuService.selectById(id);
+        YonghuEntity yonghu = yonghuService.getById(id);
 				Map<String, String> deSens = new HashMap<>();
 				DeSensUtil.desensitize(yonghu,deSens);
         return R.ok().put("data", yonghu);
@@ -282,19 +282,19 @@ public class YonghuController {
      */
     @RequestMapping("/save")
     public R save(@RequestBody YonghuEntity yonghu, HttpServletRequest request){
-        if(yonghuService.selectCount(new EntityWrapper<YonghuEntity>().eq("yonghuzhanghao", yonghu.getYonghuzhanghao()))>0) {
+        if(yonghuService.count(new QueryWrapper<YonghuEntity>().eq("yonghuzhanghao", yonghu.getYonghuzhanghao()))>0) {
             return R.error("账号已存在");
         }
     	yonghu.setId(new Date().getTime());
     	//ValidatorUtils.validateEntity(yonghu);
-    	YonghuEntity u = yonghuService.selectOne(new EntityWrapper<YonghuEntity>().eq("yonghuzhanghao", yonghu.getYonghuzhanghao()));
+    	YonghuEntity u = yonghuService.getOne(new QueryWrapper<YonghuEntity>().eq("yonghuzhanghao", yonghu.getYonghuzhanghao()));
 		if(u!=null) {
 			return R.error("用户已存在");
 		}
 		if (StringUtils.isNotBlank(yonghu.getMima())) {
 			yonghu.setMima(EncryptUtil.md5(yonghu.getMima()));
 		}
-        yonghuService.insert(yonghu);
+        yonghuService.save(yonghu);
         return R.ok();
     }
     
@@ -303,19 +303,19 @@ public class YonghuController {
      */
     @RequestMapping("/add")
     public R add(@RequestBody YonghuEntity yonghu, HttpServletRequest request){
-        if(yonghuService.selectCount(new EntityWrapper<YonghuEntity>().eq("yonghuzhanghao", yonghu.getYonghuzhanghao()))>0) {
+        if(yonghuService.count(new QueryWrapper<YonghuEntity>().eq("yonghuzhanghao", yonghu.getYonghuzhanghao()))>0) {
             return R.error("账号已存在");
         }
     	yonghu.setId(new Date().getTime());
     	//ValidatorUtils.validateEntity(yonghu);
-    	YonghuEntity u = yonghuService.selectOne(new EntityWrapper<YonghuEntity>().eq("yonghuzhanghao", yonghu.getYonghuzhanghao()));
+    	YonghuEntity u = yonghuService.getOne(new QueryWrapper<YonghuEntity>().eq("yonghuzhanghao", yonghu.getYonghuzhanghao()));
 		if(u!=null) {
 			return R.error("用户已存在");
 		}
 		if (StringUtils.isNotBlank(yonghu.getMima())) {
 			yonghu.setMima(EncryptUtil.md5(yonghu.getMima()));
 		}
-        yonghuService.insert(yonghu);
+        yonghuService.save(yonghu);
         return R.ok().put("data",yonghu.getId());
     }
 
@@ -330,7 +330,7 @@ public class YonghuController {
     @Transactional
     public R update(@RequestBody YonghuEntity yonghu, HttpServletRequest request){
         //ValidatorUtils.validateEntity(yonghu);
-        if(yonghuService.selectCount(new EntityWrapper<YonghuEntity>().ne("id", yonghu.getId()).eq("yonghuzhanghao", yonghu.getYonghuzhanghao()))>0) {
+        if(yonghuService.count(new QueryWrapper<YonghuEntity>().ne("id", yonghu.getId()).eq("yonghuzhanghao", yonghu.getYonghuzhanghao()))>0) {
             return R.error("账号已存在");
         }
         //全部更新
@@ -340,7 +340,7 @@ public class YonghuController {
         // 修改token
         TokenEntity tokenEntity = new TokenEntity();
         tokenEntity.setUsername(yonghu.getYonghuzhanghao());
-        tokenService.update(tokenEntity, new EntityWrapper<TokenEntity>().eq("userid", yonghu.getId()));
+        tokenService.update(tokenEntity, new QueryWrapper<TokenEntity>().eq("userid", yonghu.getId()));
     }
 
 
@@ -356,7 +356,7 @@ public class YonghuController {
      */
     @RequestMapping("/delete")
     public R delete(@RequestBody Long[] ids){
-        yonghuService.deleteBatchIds(Arrays.asList(ids));
+        yonghuService.removeByIds(Arrays.asList(ids));
         return R.ok();
     }
     

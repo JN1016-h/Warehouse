@@ -1,6 +1,6 @@
 package com.service;
 
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.dao.BuhuotixingDao;
 import com.entity.BuhuotixingEntity;
 import com.entity.ShangpinxinxiEntity;
@@ -39,7 +39,7 @@ public class BuhuotixingServiceImplTest {
 
     @Test
     public void checkAndCreateAlertProductNotFound() {
-        when(shangpinxinxiService.selectOne(any(EntityWrapper.class))).thenReturn(null);
+        when(shangpinxinxiService.getOne(any(QueryWrapper.class))).thenReturn(null);
 
         buhuotixingService.checkAndCreateAlert("SKU001", "user1");
 
@@ -49,7 +49,7 @@ public class BuhuotixingServiceImplTest {
     @Test
     public void checkAndCreateAlertStockAboveThreshold() {
         ShangpinxinxiEntity product = product("SKU001", 50, 10);
-        when(shangpinxinxiService.selectOne(any(EntityWrapper.class))).thenReturn(product);
+        when(shangpinxinxiService.getOne(any(QueryWrapper.class))).thenReturn(product);
 
         buhuotixingService.checkAndCreateAlert("SKU001", "user1");
 
@@ -59,8 +59,8 @@ public class BuhuotixingServiceImplTest {
     @Test
     public void checkAndCreateAlertExistingPending() {
         ShangpinxinxiEntity product = product("SKU001", 5, 10);
-        when(shangpinxinxiService.selectOne(any(EntityWrapper.class))).thenReturn(product);
-        doReturn(1).when(buhuotixingService).selectCount(any(EntityWrapper.class));
+        when(shangpinxinxiService.getOne(any(QueryWrapper.class))).thenReturn(product);
+        doReturn(1).when(buhuotixingService).selectCount(any(QueryWrapper.class));
 
         buhuotixingService.checkAndCreateAlert("SKU001", "user1");
 
@@ -73,8 +73,8 @@ public class BuhuotixingServiceImplTest {
         product.setFuzhuangmingcheng("测试商品");
         product.setShangpinfenlei("上衣");
         product.setGongyingshangmingcheng("供应商A");
-        when(shangpinxinxiService.selectOne(any(EntityWrapper.class))).thenReturn(product);
-        doReturn(0).when(buhuotixingService).selectCount(any(EntityWrapper.class));
+        when(shangpinxinxiService.getOne(any(QueryWrapper.class))).thenReturn(product);
+        doReturn(0).when(buhuotixingService).selectCount(any(QueryWrapper.class));
         doReturn(true).when(buhuotixingService).insert(any(BuhuotixingEntity.class));
 
         buhuotixingService.checkAndCreateAlert("SKU001", "user1");
@@ -85,8 +85,8 @@ public class BuhuotixingServiceImplTest {
     @Test
     public void checkAndCreateAlertUsesDefaultThreshold() {
         ShangpinxinxiEntity product = product("SKU002", 5, null);
-        when(shangpinxinxiService.selectOne(any(EntityWrapper.class))).thenReturn(product);
-        doReturn(0).when(buhuotixingService).selectCount(any(EntityWrapper.class));
+        when(shangpinxinxiService.getOne(any(QueryWrapper.class))).thenReturn(product);
+        doReturn(0).when(buhuotixingService).selectCount(any(QueryWrapper.class));
         doReturn(true).when(buhuotixingService).insert(any(BuhuotixingEntity.class));
 
         buhuotixingService.checkAndCreateAlert("SKU002", "user1");
@@ -138,7 +138,7 @@ public class BuhuotixingServiceImplTest {
         params.put("limit", "10");
         doReturn(Collections.emptyList()).when(buhuotixingDao).selectListView(any(), any());
 
-        assertNotNull(buhuotixingService.queryPage(params, new EntityWrapper<BuhuotixingEntity>()));
+        assertNotNull(buhuotixingService.queryPage(params, new QueryWrapper<BuhuotixingEntity>()));
     }
 
     private ShangpinxinxiEntity product(String sku, int stock, Integer threshold) {

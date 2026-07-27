@@ -23,8 +23,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
-import com.baomidou.mybatisplus.mapper.Wrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.annotation.IgnoreAuth;
 
 import com.entity.BuhuotixingEntity;
@@ -64,7 +64,7 @@ public class BuhuotixingController {
             buhuotixing.setChuangjianren(username);
         }
         
-        EntityWrapper<BuhuotixingEntity> ew = new EntityWrapper<BuhuotixingEntity>();
+        QueryWrapper<BuhuotixingEntity> ew = new QueryWrapper<BuhuotixingEntity>();
 
         PageUtils page = buhuotixingService.queryPage(params, MPUtil.sort(MPUtil.between(MPUtil.likeOrEq(ew, buhuotixing), params), params));
 
@@ -78,7 +78,7 @@ public class BuhuotixingController {
     @RequestMapping("/list")
     public R list(@RequestParam Map<String, Object> params, BuhuotixingEntity buhuotixing, 
                   HttpServletRequest request){
-        EntityWrapper<BuhuotixingEntity> ew = new EntityWrapper<BuhuotixingEntity>();
+        QueryWrapper<BuhuotixingEntity> ew = new QueryWrapper<BuhuotixingEntity>();
 
         PageUtils page = buhuotixingService.queryPage(params, MPUtil.sort(MPUtil.between(MPUtil.likeOrEq(ew, buhuotixing), params), params));
         return R.ok().put("data", page);
@@ -89,8 +89,8 @@ public class BuhuotixingController {
      */
     @RequestMapping("/lists")
     public R list(BuhuotixingEntity buhuotixing){
-        EntityWrapper<BuhuotixingEntity> ew = new EntityWrapper<BuhuotixingEntity>();
-        ew = (EntityWrapper<BuhuotixingEntity>) MPUtil.allLike(ew, buhuotixing);
+        QueryWrapper<BuhuotixingEntity> ew = new QueryWrapper<BuhuotixingEntity>();
+        ew = (QueryWrapper<BuhuotixingEntity>) MPUtil.allLike(ew, buhuotixing);
         return R.ok().put("data", buhuotixingService.selectListView(ew));
     }
 
@@ -99,8 +99,8 @@ public class BuhuotixingController {
      */
     @RequestMapping("/query")
     public R query(BuhuotixingEntity buhuotixing){
-        EntityWrapper<BuhuotixingEntity> ew = new EntityWrapper<BuhuotixingEntity>();
-        ew = (EntityWrapper<BuhuotixingEntity>) MPUtil.allLike(ew, buhuotixing);
+        QueryWrapper<BuhuotixingEntity> ew = new QueryWrapper<BuhuotixingEntity>();
+        ew = (QueryWrapper<BuhuotixingEntity>) MPUtil.allLike(ew, buhuotixing);
         BuhuotixingView buhuotixingView = buhuotixingService.selectView(ew);
         return R.ok("查询补货提醒成功").put("data", buhuotixingView);
     }
@@ -110,7 +110,7 @@ public class BuhuotixingController {
      */
     @RequestMapping("/info/{id}")
     public R info(@PathVariable("id") Long id){
-        BuhuotixingEntity buhuotixing = buhuotixingService.selectById(id);
+        BuhuotixingEntity buhuotixing = buhuotixingService.getById(id);
         return R.ok().put("data", buhuotixing);
     }
 
@@ -120,7 +120,7 @@ public class BuhuotixingController {
     @IgnoreAuth
     @RequestMapping("/detail/{id}")
     public R detail(@PathVariable("id") Long id){
-        BuhuotixingEntity buhuotixing = buhuotixingService.selectById(id);
+        BuhuotixingEntity buhuotixing = buhuotixingService.getById(id);
         return R.ok().put("data", buhuotixing);
     }
 
@@ -133,7 +133,7 @@ public class BuhuotixingController {
         if(buhuotixing.getTixingzhuangtai() == null || buhuotixing.getTixingzhuangtai().isEmpty()) {
             buhuotixing.setTixingzhuangtai("待处理");
         }
-        buhuotixingService.insert(buhuotixing);
+        buhuotixingService.save(buhuotixing);
         return R.ok();
     }
     
@@ -146,7 +146,7 @@ public class BuhuotixingController {
         if(buhuotixing.getTixingzhuangtai() == null || buhuotixing.getTixingzhuangtai().isEmpty()) {
             buhuotixing.setTixingzhuangtai("待处理");
         }
-        buhuotixingService.insert(buhuotixing);
+        buhuotixingService.save(buhuotixing);
         return R.ok();
     }
 
@@ -166,7 +166,7 @@ public class BuhuotixingController {
      */
     @RequestMapping("/delete")
     public R delete(@RequestBody Long[] ids){
-        buhuotixingService.deleteBatchIds(Arrays.asList(ids));
+        buhuotixingService.removeByIds(Arrays.asList(ids));
         return R.ok();
     }
     
@@ -200,7 +200,7 @@ public class BuhuotixingController {
 			}
 		}
 		
-		Wrapper<BuhuotixingEntity> wrapper = new EntityWrapper<BuhuotixingEntity>();
+		QueryWrapper<BuhuotixingEntity> wrapper = new QueryWrapper<BuhuotixingEntity>();
 		if(map.get("remindstart")!=null) {
 			wrapper.ge(columnName, map.get("remindstart"));
 		}
@@ -208,7 +208,7 @@ public class BuhuotixingController {
 			wrapper.le(columnName, map.get("remindend"));
 		}
 
-		int count = buhuotixingService.selectCount(wrapper);
+		long count = buhuotixingService.count(wrapper);
 		return R.ok().put("count", count);
 	}
 	
@@ -235,8 +235,8 @@ public class BuhuotixingController {
      */
     @RequestMapping("/count")
     public R count(@RequestParam Map<String, Object> params, BuhuotixingEntity buhuotixing) {
-        EntityWrapper<BuhuotixingEntity> ew = new EntityWrapper<BuhuotixingEntity>();
-        int count = buhuotixingService.selectCount(
+        QueryWrapper<BuhuotixingEntity> ew = new QueryWrapper<BuhuotixingEntity>();
+        long count = buhuotixingService.count(
             MPUtil.sort(MPUtil.between(MPUtil.likeOrEq(ew, buhuotixing), params), params));
         return R.ok().put("data", count);
     }
@@ -249,7 +249,7 @@ public class BuhuotixingController {
         Map<String, Object> params = new HashMap<String, Object>();
         params.put("xColumn", xColumnName);
         params.put("yColumn", yColumnName);
-        EntityWrapper<BuhuotixingEntity> ew = new EntityWrapper<BuhuotixingEntity>();
+        QueryWrapper<BuhuotixingEntity> ew = new QueryWrapper<BuhuotixingEntity>();
         List<Map<String, Object>> result = buhuotixingService.selectValue(params, ew);
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
         for(Map<String, Object> m : result) {
@@ -271,7 +271,7 @@ public class BuhuotixingController {
         params.put("xColumn", xColumnName);
         params.put("yColumn", yColumnName);
         params.put("timeStatType", timeStatType);
-        EntityWrapper<BuhuotixingEntity> ew = new EntityWrapper<BuhuotixingEntity>();
+        QueryWrapper<BuhuotixingEntity> ew = new QueryWrapper<BuhuotixingEntity>();
         List<Map<String, Object>> result = buhuotixingService.selectTimeStatValue(params, ew);
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
         for(Map<String, Object> m : result) {
@@ -291,7 +291,7 @@ public class BuhuotixingController {
     public R group(@PathVariable("columnName") String columnName,HttpServletRequest request) {
         Map<String, Object> params = new HashMap<String, Object>();
         params.put("column", columnName);
-        EntityWrapper<BuhuotixingEntity> ew = new EntityWrapper<BuhuotixingEntity>();
+        QueryWrapper<BuhuotixingEntity> ew = new QueryWrapper<BuhuotixingEntity>();
         List<Map<String, Object>> result = buhuotixingService.selectGroup(params, ew);
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
         for(Map<String, Object> m : result) {

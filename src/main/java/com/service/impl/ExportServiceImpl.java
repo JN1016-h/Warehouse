@@ -35,15 +35,15 @@ public class ExportServiceImpl implements ExportService {
             // 创建标题行样式
             CellStyle headerStyle = workbook.createCellStyle();
             headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
-            headerStyle.setFillPattern(CellStyle.SOLID_FOREGROUND);
-            headerStyle.setBorderBottom(CellStyle.BORDER_THIN);
-            headerStyle.setBorderTop(CellStyle.BORDER_THIN);
-            headerStyle.setBorderLeft(CellStyle.BORDER_THIN);
-            headerStyle.setBorderRight(CellStyle.BORDER_THIN);
-            headerStyle.setAlignment(CellStyle.ALIGN_CENTER);
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            headerStyle.setBorderBottom(BorderStyle.THIN);
+            headerStyle.setBorderTop(BorderStyle.THIN);
+            headerStyle.setBorderLeft(BorderStyle.THIN);
+            headerStyle.setBorderRight(BorderStyle.THIN);
+            headerStyle.setAlignment(HorizontalAlignment.CENTER);
             
             org.apache.poi.ss.usermodel.Font headerFont = workbook.createFont();
-            headerFont.setBoldweight(org.apache.poi.ss.usermodel.Font.BOLDWEIGHT_BOLD);
+            headerFont.setBold(true);
             headerStyle.setFont(headerFont);
             
             // 创建标题行
@@ -56,10 +56,10 @@ public class ExportServiceImpl implements ExportService {
             
             // 创建数据行样式
             CellStyle dataStyle = workbook.createCellStyle();
-            dataStyle.setBorderBottom(CellStyle.BORDER_THIN);
-            dataStyle.setBorderTop(CellStyle.BORDER_THIN);
-            dataStyle.setBorderLeft(CellStyle.BORDER_THIN);
-            dataStyle.setBorderRight(CellStyle.BORDER_THIN);
+            dataStyle.setBorderBottom(BorderStyle.THIN);
+            dataStyle.setBorderTop(BorderStyle.THIN);
+            dataStyle.setBorderLeft(BorderStyle.THIN);
+            dataStyle.setBorderRight(BorderStyle.THIN);
             
             // 填充数据
             for (int i = 0; i < data.size(); i++) {

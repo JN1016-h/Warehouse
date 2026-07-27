@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>2.2.2.RELEASE</version>
+		<version>2.7.18</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.jlwl</groupId>
@@ -17,13 +17,17 @@
 
 	<properties>
 		<java.version>1.8</java.version>
-		<fastjson.version>1.2.8</fastjson.version>
+		<fastjson.version>1.2.83</fastjson.version>
 		<maven-jar-plugin.version>3.1.1</maven-jar-plugin.version>
 		<mockito.version>4.11.0</mockito.version>
 		<bytebuddy.version>1.14.12</bytebuddy.version>
-		<!-- Override Boot 2.2 managed logback 1.2.3 (CVE-2023-6378). -->
-		<!-- Keep 1.2.x: Spring Boot 2.2 expects SLF4J 1.7; logback 1.3+ needs SLF4J 2 and can fail startup. -->
+		<!-- Security pins on top of Boot 2.7.18 BOM (Java 8) -->
 		<logback.version>1.2.13</logback.version>
+		<tomcat.version>9.0.113</tomcat.version>
+		<jackson-bom.version>2.17.3</jackson-bom.version>
+		<snakeyaml.version>1.33</snakeyaml.version>
+		<spring-framework.version>5.3.39</spring-framework.version>
+		<mybatis-plus.version>3.5.7</mybatis-plus.version>
 		<skipTests>false</skipTests>
 		<!-- Sonar / JaCoCo (CI uploads coverage + issues to remote SonarQube) -->
 		<sonar.projectKey>warehouse-management</sonar.projectKey>
@@ -47,45 +51,32 @@
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>org.mybatis.spring.boot</groupId>
-			<artifactId>mybatis-spring-boot-starter</artifactId>
-			<version>2.1.1</version>
-		</dependency>
-		<dependency>
 		    <groupId>org.springframework.boot</groupId>
 		    <artifactId>spring-boot-starter-jdbc</artifactId>
 		</dependency>
-		
+		<!-- MyBatis-Plus 3.5.7 (fixes CVE-2023-25330 TenantPlugin; replaces MP 2.3) -->
 		<dependency>
-		    <groupId>mysql</groupId>
-		    <artifactId>mysql-connector-java</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.shiro</groupId>
-			<artifactId>shiro-spring</artifactId>
-			<version>1.3.2</version>
+			<groupId>com.baomidou</groupId>
+			<artifactId>mybatis-plus-boot-starter</artifactId>
+			<version>${mybatis-plus.version}</version>
 		</dependency>
 		
 		<dependency>
-			<groupId>com.baomidou</groupId>
-			<artifactId>mybatis-plus</artifactId>
-			<version>2.3</version>
+		    <groupId>com.mysql</groupId>
+		    <artifactId>mysql-connector-j</artifactId>
+		    <version>8.3.0</version>
 		</dependency>
-		<dependency>
-			<groupId>com.baomidou</groupId>
-			<artifactId>mybatisplus-spring-boot-starter</artifactId>
-			<version>1.0.5</version>
-		</dependency>
+		
 		<dependency>
 		    <groupId>com.google.protobuf</groupId>
 		    <artifactId>protobuf-java</artifactId>
-		    <version>3.10.0</version>
+		    <version>3.25.5</version>
 		</dependency>
 		
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>3.0</version>
+            <version>3.17.0</version>
         </dependency>
 		
 		<dependency>
@@ -97,7 +88,13 @@
 		<dependency>
 		    <groupId>commons-io</groupId>
 		    <artifactId>commons-io</artifactId>
-		    <version>2.5</version>
+		    <version>2.18.0</version>
+		</dependency>
+
+		<dependency>
+			<groupId>commons-beanutils</groupId>
+			<artifactId>commons-beanutils</artifactId>
+			<version>1.11.0</version>
 		</dependency>
 
         <dependency>
@@ -113,30 +110,27 @@
 		    <version>5.8.46</version>
 		</dependency>
 		
-		<!-- FastJson -->
+		<!-- FastJson (1.2.83 closes CVE-2017-18349 / CVE-2025-70974 class) -->
 		<dependency>
 			<groupId>com.alibaba</groupId>
 			<artifactId>fastjson</artifactId>
 			<version>${fastjson.version}</version>
 		</dependency>
-		<!-- <dependency>
-		    <groupId>com.microsoft.sqlserver</groupId>
-		    <artifactId>sqljdbc4</artifactId>
-		    <scope>4.0</scope>
-		    <version>4.0</version>
-		</dependency>
-		
-		<dependency>
-		    <groupId>com.microsoft.sqlserver</groupId>
-		    <artifactId>mssql-jdbc</artifactId>
-		    <version>6.2.0.jre8</version>
-		    <scope>runtime</scope>
-		</dependency> -->
-		<!-- 百度人工智能 -->
+		<!-- 百度人工智能 (exclude log4j1 CRITICAL CVEs; route via slf4j) -->
 		<dependency>
     		<groupId>com.baidu.aip</groupId>
     		<artifactId>java-sdk</artifactId>
     		<version>4.4.1</version>
+			<exclusions>
+				<exclusion>
+					<groupId>log4j</groupId>
+					<artifactId>log4j</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>log4j-over-slf4j</artifactId>
 		</dependency>
     <!-- Spring WebSocket -->
         <dependency>
@@ -147,18 +141,30 @@
             <groupId>com.mashape.unirest</groupId>
             <artifactId>unirest-java</artifactId>
             <version>1.4.9</version>
+			<exclusions>
+				<exclusion>
+					<groupId>log4j</groupId>
+					<artifactId>log4j</artifactId>
+				</exclusion>
+			</exclusions>
         </dependency>
+
+		<dependency>
+			<groupId>org.json</groupId>
+			<artifactId>json</artifactId>
+			<version>20240303</version>
+		</dependency>
 
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi</artifactId>
-            <version>3.11</version>
+            <version>5.2.5</version>
         </dependency>
 
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
-            <version>3.11</version>
+            <version>5.2.5</version>
         </dependency>
 
         <dependency>
@@ -177,7 +183,7 @@
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
-            <version>4.5.2</version>
+            <version>4.5.14</version>
         </dependency>
 
         <!-- AI 助手：分析结果缓存（NFR2） -->

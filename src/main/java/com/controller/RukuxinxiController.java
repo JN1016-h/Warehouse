@@ -26,8 +26,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
-import com.baomidou.mybatisplus.mapper.Wrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.annotation.IgnoreAuth;
 
 import com.entity.RukuxinxiEntity;
@@ -85,7 +85,7 @@ public class RukuxinxiController {
 			String username = (String)request.getSession().getAttribute("username");
 			rukuxinxi.setZhanghao(username);
 		}
-        EntityWrapper<RukuxinxiEntity> ew = new EntityWrapper<RukuxinxiEntity>();
+        QueryWrapper<RukuxinxiEntity> ew = new QueryWrapper<RukuxinxiEntity>();
 
 
 
@@ -102,7 +102,7 @@ public class RukuxinxiController {
     @RequestMapping("/list")
     public R list(@RequestParam Map<String, Object> params,RukuxinxiEntity rukuxinxi, 
 		HttpServletRequest request){
-        EntityWrapper<RukuxinxiEntity> ew = new EntityWrapper<RukuxinxiEntity>();
+        QueryWrapper<RukuxinxiEntity> ew = new QueryWrapper<RukuxinxiEntity>();
 
 		PageUtils page = rukuxinxiService.queryPage(params, MPUtil.sort(MPUtil.between(MPUtil.likeOrEq(ew, rukuxinxi), params), params));
 		
@@ -118,7 +118,7 @@ public class RukuxinxiController {
      */
     @RequestMapping("/lists")
     public R list( RukuxinxiEntity rukuxinxi){
-       	EntityWrapper<RukuxinxiEntity> ew = new EntityWrapper<RukuxinxiEntity>();
+       	QueryWrapper<RukuxinxiEntity> ew = new QueryWrapper<RukuxinxiEntity>();
       	ew.allEq(MPUtil.allEQMapPre( rukuxinxi, "rukuxinxi")); 
         return R.ok().put("data", rukuxinxiService.selectListView(ew));
     }
@@ -128,7 +128,7 @@ public class RukuxinxiController {
      */
     @RequestMapping("/query")
     public R query(RukuxinxiEntity rukuxinxi){
-        EntityWrapper< RukuxinxiEntity> ew = new EntityWrapper< RukuxinxiEntity>();
+        QueryWrapper< RukuxinxiEntity> ew = new QueryWrapper< RukuxinxiEntity>();
  		ew.allEq(MPUtil.allEQMapPre( rukuxinxi, "rukuxinxi")); 
 		RukuxinxiView rukuxinxiView =  rukuxinxiService.selectView(ew);
 		return R.ok("查询入库信息成功").put("data", rukuxinxiView);
@@ -139,7 +139,7 @@ public class RukuxinxiController {
      */
     @RequestMapping("/info/{id}")
     public R info(@PathVariable("id") Long id){
-        RukuxinxiEntity rukuxinxi = rukuxinxiService.selectById(id);
+        RukuxinxiEntity rukuxinxi = rukuxinxiService.getById(id);
 				Map<String, String> deSens = new HashMap<>();
 				DeSensUtil.desensitize(rukuxinxi,deSens);
         return R.ok().put("data", rukuxinxi);
@@ -151,7 +151,7 @@ public class RukuxinxiController {
 	@IgnoreAuth
     @RequestMapping("/detail/{id}")
     public R detail(@PathVariable("id") Long id){
-        RukuxinxiEntity rukuxinxi = rukuxinxiService.selectById(id);
+        RukuxinxiEntity rukuxinxi = rukuxinxiService.getById(id);
 				Map<String, String> deSens = new HashMap<>();
 				DeSensUtil.desensitize(rukuxinxi,deSens);
         return R.ok().put("data", rukuxinxi);
@@ -177,13 +177,13 @@ public class RukuxinxiController {
     		rukuxinxi.setXingming(xingming);
     	}
     	
-        rukuxinxiService.insert(rukuxinxi);
+        rukuxinxiService.save(rukuxinxi);
         
         // 更新商品库存
         if(rukuxinxi.getFuzhuangbianhao() != null && rukuxinxi.getFuzhuangkucun() != null) {
-            EntityWrapper<ShangpinxinxiEntity> wrapper = new EntityWrapper<>();
+            QueryWrapper<ShangpinxinxiEntity> wrapper = new QueryWrapper<>();
             wrapper.eq("fuzhuangbianhao", rukuxinxi.getFuzhuangbianhao());
-            ShangpinxinxiEntity product = shangpinxinxiService.selectOne(wrapper);
+            ShangpinxinxiEntity product = shangpinxinxiService.getOne(wrapper);
             if(product != null) {
                 Integer currentStock = product.getFuzhuangkucun() != null ? product.getFuzhuangkucun() : 0;
                 product.setFuzhuangkucun(currentStock + rukuxinxi.getFuzhuangkucun());
@@ -206,7 +206,7 @@ public class RukuxinxiController {
     @RequestMapping("/add")
     public R add(@RequestBody RukuxinxiEntity rukuxinxi, HttpServletRequest request){
     	//ValidatorUtils.validateEntity(rukuxinxi);
-        rukuxinxiService.insert(rukuxinxi);
+        rukuxinxiService.save(rukuxinxi);
         return R.ok().put("data",rukuxinxi.getId());
     }
 
@@ -236,7 +236,7 @@ public class RukuxinxiController {
      */
     @RequestMapping("/delete")
     public R delete(@RequestBody Long[] ids){
-        rukuxinxiService.deleteBatchIds(Arrays.asList(ids));
+        rukuxinxiService.removeByIds(Arrays.asList(ids));
         return R.ok();
     }
     
@@ -262,7 +262,7 @@ public class RukuxinxiController {
         Map<String, Object> params = new HashMap<String, Object>();
         params.put("xColumn", xColumnName);
         params.put("yColumn", yColumnName);
-        EntityWrapper<RukuxinxiEntity> ew = new EntityWrapper<RukuxinxiEntity>();
+        QueryWrapper<RukuxinxiEntity> ew = new QueryWrapper<RukuxinxiEntity>();
         String tableName = request.getSession().getAttribute("tableName").toString();
                                                         if(tableName.equals("yonghu")) {
             ew.eq("zhanghao", (String)request.getSession().getAttribute("username"));
@@ -301,7 +301,7 @@ public class RukuxinxiController {
         params.put("xColumn", xColumnName);
         List<List<Map<String, Object>>> result2 = new ArrayList<List<Map<String,Object>>>();
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-        EntityWrapper<RukuxinxiEntity> ew = new EntityWrapper<RukuxinxiEntity>();
+        QueryWrapper<RukuxinxiEntity> ew = new QueryWrapper<RukuxinxiEntity>();
 String tableName = request.getSession().getAttribute("tableName").toString();
                                                         if(tableName.equals("yonghu")) {
             ew.eq("zhanghao", (String)request.getSession().getAttribute("username"));
@@ -336,7 +336,7 @@ String tableName = request.getSession().getAttribute("tableName").toString();
             params.put("xColumn", xColumnName);
             params.put("yColumn", yColumnName);
             params.put("timeStatType", timeStatType);
-            EntityWrapper<RukuxinxiEntity> ew = new EntityWrapper<RukuxinxiEntity>();
+            QueryWrapper<RukuxinxiEntity> ew = new QueryWrapper<RukuxinxiEntity>();
     String tableName = request.getSession().getAttribute("tableName").toString();
                                                                                                                                                             if(tableName.equals("yonghu")) {
                 ew.eq("zhanghao", (String)request.getSession().getAttribute("username"));
@@ -371,7 +371,7 @@ String tableName = request.getSession().getAttribute("tableName").toString();
             params.put("timeStatType", timeStatType);
             List<List<Map<String, Object>>> result2 = new ArrayList<List<Map<String,Object>>>();
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-            EntityWrapper<RukuxinxiEntity> ew = new EntityWrapper<RukuxinxiEntity>();
+            QueryWrapper<RukuxinxiEntity> ew = new QueryWrapper<RukuxinxiEntity>();
     String tableName = request.getSession().getAttribute("tableName").toString();
                                                                                                                                                             if(tableName.equals("yonghu")) {
                 ew.eq("zhanghao", (String)request.getSession().getAttribute("username"));
@@ -404,7 +404,7 @@ String tableName = request.getSession().getAttribute("tableName").toString();
         }else{
         Map<String, Object> params = new HashMap<String, Object>();
         params.put("column", columnName);
-        EntityWrapper<RukuxinxiEntity> ew = new EntityWrapper<RukuxinxiEntity>();
+        QueryWrapper<RukuxinxiEntity> ew = new QueryWrapper<RukuxinxiEntity>();
 String tableName = request.getSession().getAttribute("tableName").toString();
                                                         if(tableName.equals("yonghu")) {
             ew.eq("zhanghao", (String)request.getSession().getAttribute("username"));
@@ -436,8 +436,8 @@ String tableName = request.getSession().getAttribute("tableName").toString();
         if(tableName.equals("yonghu")) {
             rukuxinxi.setZhanghao((String)request.getSession().getAttribute("username"));
         }
-        EntityWrapper<RukuxinxiEntity> ew = new EntityWrapper<RukuxinxiEntity>();
-        int count = rukuxinxiService.selectCount(MPUtil.sort(MPUtil.between(MPUtil.likeOrEq(ew, rukuxinxi), params), params));
+        QueryWrapper<RukuxinxiEntity> ew = new QueryWrapper<RukuxinxiEntity>();
+        long count = rukuxinxiService.count(MPUtil.sort(MPUtil.between(MPUtil.likeOrEq(ew, rukuxinxi), params), params));
         return R.ok().put("data", count);
     }
 

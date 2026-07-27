@@ -66,14 +66,14 @@ public class BuhuotixingControllerTest {
 
     @Test
     public void testInfo() {
-        when(buhuotixingService.selectById(1L)).thenReturn(new BuhuotixingEntity());
+        when(buhuotixingService.getById(1L)).thenReturn(new BuhuotixingEntity());
         R result = controller.info(1L);
         assertEquals(0, result.get("code"));
     }
 
     @Test
     public void testDetail() {
-        when(buhuotixingService.selectById(1L)).thenReturn(new BuhuotixingEntity());
+        when(buhuotixingService.getById(1L)).thenReturn(new BuhuotixingEntity());
         R result = controller.detail(1L);
         assertEquals(0, result.get("code"));
     }
@@ -106,7 +106,7 @@ public class BuhuotixingControllerTest {
 
     @Test
     public void testRemindCountType1() {
-        when(buhuotixingService.selectCount(any())).thenReturn(3);
+        when(buhuotixingService.count(any())).thenReturn(3);
         Map<String, Object> map = new HashMap<String, Object>();
         R result = controller.remindCount("addtime", ControllerTestSupport.mockAdminRequest(), "1", map);
         assertEquals(0, result.get("code"));
@@ -115,7 +115,7 @@ public class BuhuotixingControllerTest {
 
     @Test
     public void testRemindCountType2() {
-        when(buhuotixingService.selectCount(any())).thenReturn(2);
+        when(buhuotixingService.count(any())).thenReturn(2);
         Map<String, Object> map = new HashMap<String, Object>();
         map.put("remindstart", "1");
         map.put("remindend", "7");
@@ -137,7 +137,7 @@ public class BuhuotixingControllerTest {
 
     @Test
     public void testCount() {
-        when(buhuotixingService.selectCount(any())).thenReturn(5);
+        when(buhuotixingService.count(any())).thenReturn(5);
         R result = controller.count(ControllerTestSupport.pageParams(), new BuhuotixingEntity());
         assertEquals(0, result.get("code"));
     }
@@ -186,7 +186,7 @@ public class BuhuotixingControllerTest {
 
     @Test
     public void testRemindCountType2EmptyMap() {
-        when(buhuotixingService.selectCount(any())).thenReturn(1);
+        when(buhuotixingService.count(any())).thenReturn(1);
         R result = controller.remindCount("addtime", ControllerTestSupport.mockAdminRequest(), "2",
                 new HashMap<String, Object>());
         assertEquals(0, result.get("code"));
@@ -210,7 +210,7 @@ public class BuhuotixingControllerTest {
 
     @Test
     public void testRemindCountType2OnlyStart() {
-        when(buhuotixingService.selectCount(any())).thenReturn(2);
+        when(buhuotixingService.count(any())).thenReturn(2);
         Map<String, Object> map = new HashMap<String, Object>();
         map.put("remindstart", "3");
         R result = controller.remindCount("addtime", ControllerTestSupport.mockAdminRequest(), "2", map);
@@ -219,7 +219,7 @@ public class BuhuotixingControllerTest {
 
     @Test
     public void testRemindCountType2OnlyEnd() {
-        when(buhuotixingService.selectCount(any())).thenReturn(1);
+        when(buhuotixingService.count(any())).thenReturn(1);
         Map<String, Object> map = new HashMap<String, Object>();
         map.put("remindend", "7");
         R result = controller.remindCount("addtime", ControllerTestSupport.mockAdminRequest(), "2", map);
@@ -240,7 +240,7 @@ public class BuhuotixingControllerTest {
 
     @Test
     public void testRemindCountType1WithRange() {
-        when(buhuotixingService.selectCount(any())).thenReturn(4);
+        when(buhuotixingService.count(any())).thenReturn(4);
         Map<String, Object> map = new HashMap<String, Object>();
         map.put("remindstart", "2025-01-01");
         map.put("remindend", "2025-12-31");

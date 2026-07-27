@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.annotation.IgnoreAuth;
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.entity.ConfigEntity;
 import com.service.ConfigService;
 import com.utils.MPUtil;
@@ -37,7 +37,7 @@ public class ConfigController{
      */
     @RequestMapping("/page")
     public R page(@RequestParam Map<String, Object> params,ConfigEntity config){
-        EntityWrapper<ConfigEntity> ew = new EntityWrapper<ConfigEntity>();
+        QueryWrapper<ConfigEntity> ew = new QueryWrapper<ConfigEntity>();
     	PageUtils page = configService.queryPage(params, MPUtil.sort(MPUtil.between(MPUtil.likeOrEq(ew, config), params), params));
         return R.ok().put("data", page);
     }
@@ -48,7 +48,7 @@ public class ConfigController{
     @IgnoreAuth
     @RequestMapping("/list")
     public R list(@RequestParam Map<String, Object> params,ConfigEntity config){
-        EntityWrapper<ConfigEntity> ew = new EntityWrapper<ConfigEntity>();
+        QueryWrapper<ConfigEntity> ew = new QueryWrapper<ConfigEntity>();
     	PageUtils page = configService.queryPage(params, MPUtil.sort(MPUtil.between(MPUtil.likeOrEq(ew, config), params), params));
         return R.ok().put("data", page);
     }
@@ -58,7 +58,7 @@ public class ConfigController{
      */
     @RequestMapping("/info/{id}")
     public R info(@PathVariable("id") String id){
-        ConfigEntity config = configService.selectById(id);
+        ConfigEntity config = configService.getById(id);
         return R.ok().put("data", config);
     }
     
@@ -68,7 +68,7 @@ public class ConfigController{
     @IgnoreAuth
     @RequestMapping("/detail/{id}")
     public R detail(@PathVariable("id") String id){
-        ConfigEntity config = configService.selectById(id);
+        ConfigEntity config = configService.getById(id);
         return R.ok().put("data", config);
     }
     
@@ -77,7 +77,7 @@ public class ConfigController{
      */
     @RequestMapping("/info")
     public R infoByName(@RequestParam String name){
-        ConfigEntity config = configService.selectOne(new EntityWrapper<ConfigEntity>().eq("name", "faceFile"));
+        ConfigEntity config = configService.getOne(new QueryWrapper<ConfigEntity>().eq("name", "faceFile"));
         return R.ok().put("data", config);
     }
     
@@ -87,7 +87,7 @@ public class ConfigController{
     @PostMapping("/save")
     public R save(@RequestBody ConfigEntity config){
 //    	ValidatorUtils.validateEntity(config);
-    	configService.insert(config);
+    	configService.save(config);
         return R.ok();
     }
 
@@ -106,7 +106,7 @@ public class ConfigController{
      */
     @RequestMapping("/delete")
     public R delete(@RequestBody Long[] ids){
-    	configService.deleteBatchIds(Arrays.asList(ids));
+    	configService.removeByIds(Arrays.asList(ids));
         return R.ok();
     }
 }

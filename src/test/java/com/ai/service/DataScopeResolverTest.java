@@ -56,7 +56,7 @@ public class DataScopeResolverTest {
 
         YonghuEntity yonghu = new YonghuEntity();
         yonghu.setUserRole("DEALER");
-        when(yonghuService.selectById(2L)).thenReturn(yonghu);
+        when(yonghuService.getById(2L)).thenReturn(yonghu);
 
         DataScopeResolver.ResolvedUser user = dataScopeResolver.resolve(request);
 
@@ -72,7 +72,7 @@ public class DataScopeResolverTest {
 
         YonghuEntity yonghu = new YonghuEntity();
         yonghu.setUserRole("WAREHOUSE_ADMIN");
-        when(yonghuService.selectById(3L)).thenReturn(yonghu);
+        when(yonghuService.getById(3L)).thenReturn(yonghu);
 
         DataScopeResolver.ResolvedUser user = dataScopeResolver.resolve(request);
 
@@ -89,7 +89,7 @@ public class DataScopeResolverTest {
 
         YonghuEntity yonghu = new YonghuEntity();
         yonghu.setUserRole("INTERNAL_STAFF");
-        when(yonghuService.selectById(4L)).thenReturn(yonghu);
+        when(yonghuService.getById(4L)).thenReturn(yonghu);
 
         DataScopeResolver.ResolvedUser user = dataScopeResolver.resolve(request);
 

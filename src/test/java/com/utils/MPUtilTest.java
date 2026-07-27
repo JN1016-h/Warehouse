@@ -1,7 +1,7 @@
 package com.utils;
 
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
-import com.baomidou.mybatisplus.mapper.Wrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockitoAnnotations;
@@ -66,11 +66,11 @@ public class MPUtilTest {
         entity.setUserName("alice");
         entity.setStatus("open");
 
-        EntityWrapper<SampleEntity> wrapper = new EntityWrapper<>();
+        QueryWrapper<SampleEntity> wrapper = new QueryWrapper<>();
         MPUtil.allLike(wrapper, entity);
         assertNotNull(wrapper.getSqlSegment());
 
-        EntityWrapper<SampleEntity> eqWrapper = new EntityWrapper<>();
+        QueryWrapper<SampleEntity> eqWrapper = new QueryWrapper<>();
         MPUtil.allEq(eqWrapper, entity);
         assertNotNull(eqWrapper.getSqlSegment());
     }
@@ -81,14 +81,14 @@ public class MPUtilTest {
         param.put("name", "%ali%");
         param.put("status", "open");
 
-        EntityWrapper<SampleEntity> wrapper = new EntityWrapper<>();
+        QueryWrapper<SampleEntity> wrapper = new QueryWrapper<>();
         MPUtil.genLikeOrEq(wrapper, param);
         assertNotNull(wrapper.getSqlSegment());
     }
 
     @Test
     public void testBetweenAndSort() {
-        EntityWrapper<SampleEntity> wrapper = new EntityWrapper<>();
+        QueryWrapper<SampleEntity> wrapper = new QueryWrapper<>();
 
         Map<String, Object> betweenParams = new HashMap<>();
         betweenParams.put("create_time_start", "2024-01-01");
@@ -99,12 +99,12 @@ public class MPUtilTest {
         Map<String, Object> sortParams = new HashMap<>();
         sortParams.put("sort", "id");
         sortParams.put("order", "desc");
-        MPUtil.sort2(new EntityWrapper<>(), sortParams);
+        MPUtil.sort2(new QueryWrapper<>(), sortParams);
 
         Map<String, Object> multiSort = new HashMap<>();
         multiSort.put("sort", "id,name");
         multiSort.put("order", "asc,desc");
-        MPUtil.sort(new EntityWrapper<>(), multiSort);
+        MPUtil.sort(new QueryWrapper<>(), multiSort);
 
         assertNotNull(wrapper.getSqlSegment());
     }
@@ -115,7 +115,7 @@ public class MPUtilTest {
         entity.setUserName("%ali%");
         entity.setStatus("open");
 
-        EntityWrapper<SampleEntity> wrapper = new EntityWrapper<>();
+        QueryWrapper<SampleEntity> wrapper = new QueryWrapper<>();
         MPUtil.likeOrEq(wrapper, entity);
         assertNotNull(wrapper.getSqlSegment());
 
@@ -127,12 +127,12 @@ public class MPUtilTest {
         Map<String, Object> params = new HashMap<>();
         params.put("sort", "id,name");
         params.put("order", "asc");
-        MPUtil.sort(new EntityWrapper<>(), params);
+        MPUtil.sort(new QueryWrapper<>(), params);
     }
 
     @Test
     public void testBetweenOnlyEndKey() {
-        EntityWrapper<SampleEntity> wrapper = new EntityWrapper<>();
+        QueryWrapper<SampleEntity> wrapper = new QueryWrapper<>();
         Map<String, Object> params = new HashMap<>();
         params.put("price_end", "100");
         MPUtil.between(wrapper, params);
@@ -141,7 +141,7 @@ public class MPUtilTest {
 
     @Test
     public void testGenLikeEmptyMap() {
-        EntityWrapper<SampleEntity> wrapper = new EntityWrapper<>();
+        QueryWrapper<SampleEntity> wrapper = new QueryWrapper<>();
         MPUtil.genLike(wrapper, new HashMap<String, Object>());
         assertNotNull(wrapper);
     }
@@ -150,7 +150,7 @@ public class MPUtilTest {
     public void testAllLikePre() {
         SampleEntity entity = new SampleEntity();
         entity.setUserName("test");
-        Wrapper<SampleEntity> wrapper = MPUtil.allLikePre(new EntityWrapper<>(), entity, "t");
+        Wrapper<SampleEntity> wrapper = MPUtil.allLikePre(new QueryWrapper<>(), entity, "t");
         assertNotNull(wrapper);
     }
 
@@ -159,7 +159,7 @@ public class MPUtilTest {
         Map<String, Object> params = new HashMap<>();
         params.put("sort", "id");
         params.put("order", "desc");
-        MPUtil.sort2(new EntityWrapper<>(), params);
+        MPUtil.sort2(new QueryWrapper<>(), params);
     }
 
     @Test
@@ -167,7 +167,7 @@ public class MPUtilTest {
         Map<String, Object> params = new HashMap<>();
         params.put("sort", "name");
         params.put("order", "asc");
-        MPUtil.sort2(new EntityWrapper<>(), params);
+        MPUtil.sort2(new QueryWrapper<>(), params);
     }
 
     @Test
@@ -175,14 +175,14 @@ public class MPUtilTest {
         Map<String, Object> params = new HashMap<>();
         params.put("sort", "id,name");
         params.put("order", "desc,asc");
-        MPUtil.sort(new EntityWrapper<>(), params);
+        MPUtil.sort(new QueryWrapper<>(), params);
     }
 
     @Test
     public void testGenLikeOrEqExactMatch() {
         Map<String, Object> param = new HashMap<>();
         param.put("status", "open");
-        EntityWrapper<SampleEntity> wrapper = new EntityWrapper<>();
+        QueryWrapper<SampleEntity> wrapper = new QueryWrapper<>();
         MPUtil.genLikeOrEq(wrapper, param);
         assertNotNull(wrapper.getSqlSegment());
     }
@@ -192,14 +192,14 @@ public class MPUtilTest {
         SampleEntity entity = new SampleEntity();
         entity.setUserName("alice");
         entity.setStatus("open");
-        EntityWrapper<SampleEntity> wrapper = new EntityWrapper<>();
+        QueryWrapper<SampleEntity> wrapper = new QueryWrapper<>();
         MPUtil.allEq(wrapper, entity);
         assertNotNull(wrapper.getSqlSegment());
     }
 
     @Test
     public void testBetweenBlankStartValue() {
-        EntityWrapper<SampleEntity> wrapper = new EntityWrapper<>();
+        QueryWrapper<SampleEntity> wrapper = new QueryWrapper<>();
         Map<String, Object> params = new HashMap<>();
         params.put("price_start", "  ");
         params.put("price_end", "100");
@@ -219,14 +219,14 @@ public class MPUtilTest {
     public void testSort2WithoutOrder() {
         Map<String, Object> params = new HashMap<>();
         params.put("sort", "id");
-        MPUtil.sort2(new EntityWrapper<>(), params);
+        MPUtil.sort2(new QueryWrapper<>(), params);
     }
 
     @Test
     public void testSortWithoutSortKey() {
         Map<String, Object> params = new HashMap<>();
         params.put("order", "asc");
-        MPUtil.sort(new EntityWrapper<>(), params);
+        MPUtil.sort(new QueryWrapper<>(), params);
     }
 
     @Test
@@ -234,7 +234,7 @@ public class MPUtilTest {
         Map<String, Object> param = new HashMap<>();
         param.put("name", "ali");
         param.put("status", "open");
-        EntityWrapper<SampleEntity> wrapper = new EntityWrapper<>();
+        QueryWrapper<SampleEntity> wrapper = new QueryWrapper<>();
         MPUtil.genLike(wrapper, param);
         assertNotNull(wrapper.getSqlSegment());
     }
@@ -243,12 +243,12 @@ public class MPUtilTest {
     public void testSort2WithoutSortKey() {
         Map<String, Object> params = new HashMap<>();
         params.put("order", "desc");
-        MPUtil.sort2(new EntityWrapper<>(), params);
+        MPUtil.sort2(new QueryWrapper<>(), params);
     }
 
     @Test
     public void testSortWithNullOrderAndSort() {
-        MPUtil.sort(new EntityWrapper<>(), new HashMap<String, Object>());
+        MPUtil.sort(new QueryWrapper<>(), new HashMap<String, Object>());
     }
 
     @Test
@@ -256,12 +256,12 @@ public class MPUtilTest {
         Map<String, Object> params = new HashMap<>();
         params.put("sort", "name");
         params.put("order", "ASC");
-        MPUtil.sort(new EntityWrapper<>(), params);
+        MPUtil.sort(new QueryWrapper<>(), params);
     }
 
     @Test
     public void testBetweenOnlyStartKeyBlank() {
-        EntityWrapper<SampleEntity> wrapper = new EntityWrapper<>();
+        QueryWrapper<SampleEntity> wrapper = new QueryWrapper<>();
         Map<String, Object> params = new HashMap<>();
         params.put("price_start", "");
         MPUtil.between(wrapper, params);
@@ -273,7 +273,7 @@ public class MPUtilTest {
         Map<String, Object> param = new HashMap<>();
         param.put("status", "open");
         param.put("name", "bob");
-        EntityWrapper<SampleEntity> wrapper = new EntityWrapper<>();
+        QueryWrapper<SampleEntity> wrapper = new QueryWrapper<>();
         MPUtil.genEq(wrapper, param);
         assertNotNull(wrapper.getSqlSegment());
     }

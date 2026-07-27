@@ -1,11 +1,11 @@
 package com.dao;
 
 import com.entity.DinghuoxinxiEntity;
-import com.baomidou.mybatisplus.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import java.util.List;
 import java.util.Map;
-import com.baomidou.mybatisplus.mapper.Wrapper;
-import com.baomidou.mybatisplus.plugins.pagination.Pagination;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 
 import org.apache.ibatis.annotations.Param;
 import com.entity.vo.DinghuoxinxiVO;
@@ -27,7 +27,7 @@ public interface DinghuoxinxiDao extends BaseMapper<DinghuoxinxiEntity> {
 	
 	List<DinghuoxinxiView> selectListView(@Param("ew") Wrapper<DinghuoxinxiEntity> wrapper);
 
-	List<DinghuoxinxiView> selectListView(Pagination page,@Param("ew") Wrapper<DinghuoxinxiEntity> wrapper);
+	List<DinghuoxinxiView> selectListView(IPage<?> page,@Param("ew") Wrapper<DinghuoxinxiEntity> wrapper);
 
 	
 	DinghuoxinxiView selectView(@Param("ew") Wrapper<DinghuoxinxiEntity> wrapper);

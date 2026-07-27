@@ -42,21 +42,21 @@ public class ConfigControllerTest {
 
     @Test
     public void testInfoById() {
-        when(configService.selectById("1")).thenReturn(new ConfigEntity());
+        when(configService.getById("1")).thenReturn(new ConfigEntity());
         R result = controller.info("1");
         assertEquals(0, result.get("code"));
     }
 
     @Test
     public void testDetail() {
-        when(configService.selectById("1")).thenReturn(new ConfigEntity());
+        when(configService.getById("1")).thenReturn(new ConfigEntity());
         R result = controller.detail("1");
         assertEquals(0, result.get("code"));
     }
 
     @Test
     public void testInfoByName() {
-        when(configService.selectOne(any())).thenReturn(new ConfigEntity());
+        when(configService.getOne(any())).thenReturn(new ConfigEntity());
         R result = controller.infoByName("faceFile");
         assertEquals(0, result.get("code"));
     }

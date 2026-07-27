@@ -4,7 +4,7 @@ import com.ai.dao.AiChatMessageDao;
 import com.ai.dao.AiChatSessionDao;
 import com.ai.entity.AiChatMessageEntity;
 import com.ai.entity.AiChatSessionEntity;
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
@@ -67,8 +67,8 @@ public class ChatHistoryService {
         if (userId == null) {
             return Collections.emptyList();
         }
-        EntityWrapper<AiChatSessionEntity> ew = new EntityWrapper<AiChatSessionEntity>();
-        ew.eq("user_id", userId).orderBy("update_time", false);
+        QueryWrapper<AiChatSessionEntity> ew = new QueryWrapper<AiChatSessionEntity>();
+        ew.eq("user_id", userId).orderBy(true, false, "update_time");
         List<AiChatSessionEntity> list = sessionDao.selectList(ew);
         return list == null ? Collections.<AiChatSessionEntity>emptyList() : list;
     }
@@ -78,8 +78,8 @@ public class ChatHistoryService {
         if (session == null || userId == null || !userId.equals(session.getUserId())) {
             return Collections.emptyList();
         }
-        EntityWrapper<AiChatMessageEntity> ew = new EntityWrapper<AiChatMessageEntity>();
-        ew.eq("session_id", sessionId).orderBy("create_time", true);
+        QueryWrapper<AiChatMessageEntity> ew = new QueryWrapper<AiChatMessageEntity>();
+        ew.eq("session_id", sessionId).orderBy(true, true, "create_time");
         List<AiChatMessageEntity> list = messageDao.selectList(ew);
         return list == null ? Collections.<AiChatMessageEntity>emptyList() : list;
     }

@@ -1,11 +1,11 @@
 package com.dao;
 
 import com.entity.GongyingshangEntity;
-import com.baomidou.mybatisplus.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import java.util.List;
 import java.util.Map;
-import com.baomidou.mybatisplus.mapper.Wrapper;
-import com.baomidou.mybatisplus.plugins.pagination.Pagination;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 
 import org.apache.ibatis.annotations.Param;
 import com.entity.vo.GongyingshangVO;
@@ -27,7 +27,7 @@ public interface GongyingshangDao extends BaseMapper<GongyingshangEntity> {
 	
 	List<GongyingshangView> selectListView(@Param("ew") Wrapper<GongyingshangEntity> wrapper);
 
-	List<GongyingshangView> selectListView(Pagination page,@Param("ew") Wrapper<GongyingshangEntity> wrapper);
+	List<GongyingshangView> selectListView(IPage<?> page,@Param("ew") Wrapper<GongyingshangEntity> wrapper);
 
 	
 	GongyingshangView selectView(@Param("ew") Wrapper<GongyingshangEntity> wrapper);

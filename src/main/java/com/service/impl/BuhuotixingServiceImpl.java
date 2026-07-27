@@ -6,10 +6,10 @@ import java.util.Map;
 import java.util.List;
 import java.util.Date;
 
-import com.baomidou.mybatisplus.mapper.Wrapper;
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
-import com.baomidou.mybatisplus.plugins.Page;
-import com.baomidou.mybatisplus.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.utils.PageUtils;
 import com.utils.Query;
 
@@ -30,9 +30,9 @@ public class BuhuotixingServiceImpl extends ServiceImpl<BuhuotixingDao, Buhuotix
 	
     @Override
     public PageUtils queryPage(Map<String, Object> params) {
-        Page<BuhuotixingEntity> page = this.selectPage(
+        Page<BuhuotixingEntity> page = this.page(
                 new Query<BuhuotixingEntity>(params).getPage(),
-                new EntityWrapper<BuhuotixingEntity>()
+                new QueryWrapper<BuhuotixingEntity>()
         );
         return new PageUtils(page);
     }
@@ -84,9 +84,9 @@ public class BuhuotixingServiceImpl extends ServiceImpl<BuhuotixingDao, Buhuotix
     @Override
     public void checkAndCreateAlert(String fuzhuangbianhao, String yonghuzhanghao) {
         // 1. 查询商品信息
-        EntityWrapper<ShangpinxinxiEntity> wrapper = new EntityWrapper<>();
+        QueryWrapper<ShangpinxinxiEntity> wrapper = new QueryWrapper<>();
         wrapper.eq("fuzhuangbianhao", fuzhuangbianhao);
-        ShangpinxinxiEntity product = shangpinxinxiService.selectOne(wrapper);
+        ShangpinxinxiEntity product = shangpinxinxiService.getOne(wrapper);
         
         if (product == null) {
             return;
@@ -101,11 +101,11 @@ public class BuhuotixingServiceImpl extends ServiceImpl<BuhuotixingDao, Buhuotix
         }
         
         // 3. 检查是否已存在该用户的待处理补货提醒
-        EntityWrapper<BuhuotixingEntity> alertWrapper = new EntityWrapper<>();
+        QueryWrapper<BuhuotixingEntity> alertWrapper = new QueryWrapper<>();
         alertWrapper.eq("fuzhuangbianhao", fuzhuangbianhao);
         alertWrapper.eq("chuangjianren", yonghuzhanghao);
         alertWrapper.eq("tixingzhuangtai", "待处理");
-        int count = this.selectCount(alertWrapper);
+        long count = this.count(alertWrapper);
         
         if (count > 0) {
             return; // 已存在该用户的待处理提醒，不重复创建
@@ -123,12 +123,12 @@ public class BuhuotixingServiceImpl extends ServiceImpl<BuhuotixingDao, Buhuotix
         alert.setTixingzhuangtai("待处理");
         alert.setChuangjianren(yonghuzhanghao); // 设置为用户账号
         
-        this.insert(alert);
+        this.save(alert);
     }
     
     @Override
     public void completeAlert(Long id) {
-        BuhuotixingEntity alert = this.selectById(id);
+        BuhuotixingEntity alert = this.getById(id);
         if (alert != null) {
             alert.setTixingzhuangtai("已完成");
             alert.setWanchengshijian(new Date());
@@ -138,7 +138,7 @@ public class BuhuotixingServiceImpl extends ServiceImpl<BuhuotixingDao, Buhuotix
     
     @Override
     public void cancelAlert(Long id) {
-        BuhuotixingEntity alert = this.selectById(id);
+        BuhuotixingEntity alert = this.getById(id);
         if (alert != null) {
             alert.setTixingzhuangtai("已取消");
             this.updateById(alert);

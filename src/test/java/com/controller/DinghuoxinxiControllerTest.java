@@ -75,14 +75,14 @@ public class DinghuoxinxiControllerTest {
 
     @Test
     public void testInfo() {
-        when(dinghuoxinxiService.selectById(1L)).thenReturn(new DinghuoxinxiEntity());
+        when(dinghuoxinxiService.getById(1L)).thenReturn(new DinghuoxinxiEntity());
         R result = controller.info(1L);
         assertEquals(0, result.get("code"));
     }
 
     @Test
     public void testDetail() {
-        when(dinghuoxinxiService.selectById(1L)).thenReturn(new DinghuoxinxiEntity());
+        when(dinghuoxinxiService.getById(1L)).thenReturn(new DinghuoxinxiEntity());
         R result = controller.detail(1L);
         assertEquals(0, result.get("code"));
     }
@@ -156,7 +156,7 @@ public class DinghuoxinxiControllerTest {
 
     @Test
     public void testCount() {
-        when(dinghuoxinxiService.selectCount(any())).thenReturn(3);
+        when(dinghuoxinxiService.count(any())).thenReturn(3);
         R result = controller.count(ControllerTestSupport.pageParams(), new DinghuoxinxiEntity(),
                 ControllerTestSupport.mockAdminRequest());
         assertEquals(0, result.get("code"));
@@ -233,7 +233,7 @@ public class DinghuoxinxiControllerTest {
 
     @Test
     public void testCountAsYonghu() {
-        when(dinghuoxinxiService.selectCount(any())).thenReturn(5);
+        when(dinghuoxinxiService.count(any())).thenReturn(5);
         R result = controller.count(ControllerTestSupport.pageParams(), new DinghuoxinxiEntity(),
                 ControllerTestSupport.mockRequestWithSession("yonghu", "user1", 1L, null));
         assertEquals(0, result.get("code"));

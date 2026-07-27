@@ -26,8 +26,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
-import com.baomidou.mybatisplus.mapper.Wrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.annotation.IgnoreAuth;
 
 import com.entity.GongyingshangEntity;
@@ -70,7 +70,7 @@ public class GongyingshangController {
     @RequestMapping("/page")
     public R page(@RequestParam Map<String, Object> params,GongyingshangEntity gongyingshang,
 		HttpServletRequest request){
-        EntityWrapper<GongyingshangEntity> ew = new EntityWrapper<GongyingshangEntity>();
+        QueryWrapper<GongyingshangEntity> ew = new QueryWrapper<GongyingshangEntity>();
 
 
 
@@ -87,7 +87,7 @@ public class GongyingshangController {
     @RequestMapping("/list")
     public R list(@RequestParam Map<String, Object> params,GongyingshangEntity gongyingshang, 
 		HttpServletRequest request){
-        EntityWrapper<GongyingshangEntity> ew = new EntityWrapper<GongyingshangEntity>();
+        QueryWrapper<GongyingshangEntity> ew = new QueryWrapper<GongyingshangEntity>();
 
 		PageUtils page = gongyingshangService.queryPage(params, MPUtil.sort(MPUtil.between(MPUtil.likeOrEq(ew, gongyingshang), params), params));
 		
@@ -103,7 +103,7 @@ public class GongyingshangController {
      */
     @RequestMapping("/lists")
     public R list( GongyingshangEntity gongyingshang){
-       	EntityWrapper<GongyingshangEntity> ew = new EntityWrapper<GongyingshangEntity>();
+       	QueryWrapper<GongyingshangEntity> ew = new QueryWrapper<GongyingshangEntity>();
       	ew.allEq(MPUtil.allEQMapPre( gongyingshang, "gongyingshang")); 
         return R.ok().put("data", gongyingshangService.selectListView(ew));
     }
@@ -113,7 +113,7 @@ public class GongyingshangController {
      */
     @RequestMapping("/query")
     public R query(GongyingshangEntity gongyingshang){
-        EntityWrapper< GongyingshangEntity> ew = new EntityWrapper< GongyingshangEntity>();
+        QueryWrapper< GongyingshangEntity> ew = new QueryWrapper< GongyingshangEntity>();
  		ew.allEq(MPUtil.allEQMapPre( gongyingshang, "gongyingshang")); 
 		GongyingshangView gongyingshangView =  gongyingshangService.selectView(ew);
 		return R.ok("查询供应商成功").put("data", gongyingshangView);
@@ -124,7 +124,7 @@ public class GongyingshangController {
      */
     @RequestMapping("/info/{id}")
     public R info(@PathVariable("id") Long id){
-        GongyingshangEntity gongyingshang = gongyingshangService.selectById(id);
+        GongyingshangEntity gongyingshang = gongyingshangService.getById(id);
 				Map<String, String> deSens = new HashMap<>();
 				DeSensUtil.desensitize(gongyingshang,deSens);
         return R.ok().put("data", gongyingshang);
@@ -136,7 +136,7 @@ public class GongyingshangController {
 	@IgnoreAuth
     @RequestMapping("/detail/{id}")
     public R detail(@PathVariable("id") Long id){
-        GongyingshangEntity gongyingshang = gongyingshangService.selectById(id);
+        GongyingshangEntity gongyingshang = gongyingshangService.getById(id);
 				Map<String, String> deSens = new HashMap<>();
 				DeSensUtil.desensitize(gongyingshang,deSens);
         return R.ok().put("data", gongyingshang);
@@ -151,7 +151,7 @@ public class GongyingshangController {
     @RequestMapping("/save")
     public R save(@RequestBody GongyingshangEntity gongyingshang, HttpServletRequest request){
     	//ValidatorUtils.validateEntity(gongyingshang);
-        gongyingshangService.insert(gongyingshang);
+        gongyingshangService.save(gongyingshang);
         return R.ok();
     }
     
@@ -161,7 +161,7 @@ public class GongyingshangController {
     @RequestMapping("/add")
     public R add(@RequestBody GongyingshangEntity gongyingshang, HttpServletRequest request){
     	//ValidatorUtils.validateEntity(gongyingshang);
-        gongyingshangService.insert(gongyingshang);
+        gongyingshangService.save(gongyingshang);
         return R.ok().put("data",gongyingshang.getId());
     }
 
@@ -191,7 +191,7 @@ public class GongyingshangController {
      */
     @RequestMapping("/delete")
     public R delete(@RequestBody Long[] ids){
-        gongyingshangService.deleteBatchIds(Arrays.asList(ids));
+        gongyingshangService.removeByIds(Arrays.asList(ids));
         return R.ok();
     }
     

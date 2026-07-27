@@ -1,7 +1,7 @@
 package com.service;
 
-import com.baomidou.mybatisplus.mapper.EntityWrapper;
-import com.baomidou.mybatisplus.plugins.Page;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.dao.ConfigDao;
 import com.entity.ConfigEntity;
 import com.service.impl.ConfigServiceImpl;
@@ -39,7 +39,7 @@ public class ConfigServiceImplTest {
         params.put("page", "1");
         params.put("limit", "10");
         Page<ConfigEntity> page = new Page<ConfigEntity>(1, 10);
-        doReturn(page).when(service).selectPage(any(Page.class), any(EntityWrapper.class));
-        assertNotNull(service.queryPage(params, new EntityWrapper<ConfigEntity>()));
+        doReturn(page).when(service).selectPage(any(Page.class), any(QueryWrapper.class));
+        assertNotNull(service.queryPage(params, new QueryWrapper<ConfigEntity>()));
     }
 }
