@@ -52,12 +52,25 @@ jobs:
 
       - name: Pack source
         run: |
-          # Pack to RUNNER_TEMP first: writing warehouse-src.tgz into "." while tar
-          # reads "." causes "file changed as we read it" (exit 1).
-          # Then copy into GITHUB_WORKSPACE for appleboy/scp-action (Docker mount).
+          set -euo pipefail
+          # 1) Archive to RUNNER_TEMP (not into ".").
+          # 2) GNU tar exits 1 on "file changed as we read it" — treat as OK if archive is non-empty.
+          # 3) Copy into GITHUB_WORKSPACE for appleboy/scp-action (Docker only mounts workspace).
           OUT="${RUNNER_TEMP}/warehouse-src.tgz"
+          set +e
           tar --exclude='./.git' --exclude='**/node_modules' --exclude='./target' \
+              --exclude='./warehouse-src.tgz' \
               -czf "$OUT" .
+          rc=$?
+          set -e
+          if [ "$rc" -gt 1 ]; then
+            echo "::error::tar failed with exit $rc"
+            exit "$rc"
+          fi
+          if [ "$rc" -eq 1 ]; then
+            echo "::warning::tar reported files changed during read (exit 1); continuing if archive is valid"
+          fi
+          test -s "$OUT"
           cp -f "$OUT" warehouse-src.tgz
           ls -lh warehouse-src.tgz
           test -s warehouse-src.tgz
