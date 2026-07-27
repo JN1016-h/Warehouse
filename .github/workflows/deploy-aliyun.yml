@@ -52,11 +52,13 @@ jobs:
 
       - name: Pack source
         run: |
-          # Tarball must live in GITHUB_WORKSPACE. appleboy/scp-action runs in Docker
-          # and only mounts the workspace; host /tmp is invisible (causes empty archive).
+          # Pack to RUNNER_TEMP first: writing warehouse-src.tgz into "." while tar
+          # reads "." causes "file changed as we read it" (exit 1).
+          # Then copy into GITHUB_WORKSPACE for appleboy/scp-action (Docker mount).
+          OUT="${RUNNER_TEMP}/warehouse-src.tgz"
           tar --exclude='./.git' --exclude='**/node_modules' --exclude='./target' \
-              --exclude='./warehouse-src.tgz' \
-              -czf warehouse-src.tgz .
+              -czf "$OUT" .
+          cp -f "$OUT" warehouse-src.tgz
           ls -lh warehouse-src.tgz
           test -s warehouse-src.tgz
 
