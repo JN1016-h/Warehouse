@@ -54,7 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           # 1) Archive to RUNNER_TEMP (not into ".").
-          # 2) GNU tar exits 1 on "file changed as we read it" — treat as OK if archive is non-empty.
+          # 2) GNU tar exits 1 on "file changed as we read it" - treat as OK if archive is non-empty.
           # 3) Copy into GITHUB_WORKSPACE for appleboy/scp-action (Docker only mounts workspace).
           OUT="${RUNNER_TEMP}/warehouse-src.tgz"
           set +e
