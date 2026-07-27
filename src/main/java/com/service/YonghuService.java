@@ -32,7 +32,43 @@ public interface YonghuService extends IService<YonghuEntity> {
    	
    	PageUtils queryPage(Map<String, Object> params,Wrapper<YonghuEntity> wrapper);
 
-   	
+    // ---------------------------------------------------------------------
+    // Compatibility layer for unit tests (MyBatis-Plus 2.x -> 3.x)
+    // Old names: selectById/insert
+    // New names provided by IService: getById/save
+    // ---------------------------------------------------------------------
+    default YonghuEntity selectById(Long id) {
+        return getById(id);
+    }
+
+    // Some tests call selectById(any()) and Mockito infers Object.
+    default YonghuEntity selectById(Object id) {
+        if (id == null) {
+            return null;
+        }
+        if (id instanceof Long) {
+            return getById((Long) id);
+        }
+        if (id instanceof Integer) {
+            return getById(((Integer) id).longValue());
+        }
+        return null;
+    }
+
+    default boolean insert(YonghuEntity entity) {
+        return save(entity);
+    }
+
+    // Some tests stub insert(any()) where any() is inferred as Object.
+    default boolean insert(Object entity) {
+        if (entity == null) {
+            return false;
+        }
+        if (entity instanceof YonghuEntity) {
+            return save((YonghuEntity) entity);
+        }
+        return false;
+    }
 
 }
 

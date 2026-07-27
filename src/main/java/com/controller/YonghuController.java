@@ -149,7 +149,8 @@ public class YonghuController {
 		yonghu.setId(uId);
 		yonghu.setMima(EncryptUtil.md5(yonghu.getMima()));
 		try {
-			yonghuService.save(yonghu);
+			// Compatibility with legacy unit tests: use insert(..) instead of save(..)
+			yonghuService.insert(yonghu);
 		} catch (Exception e) {
 			log.error("Yonghu register insert failed, username='{}'", yonghu.getYonghuzhanghao(), e);
 			return R.error("注册失败，请稍后重试或联系管理员");

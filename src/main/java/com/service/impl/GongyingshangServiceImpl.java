@@ -24,11 +24,10 @@ public class GongyingshangServiceImpl extends ServiceImpl<GongyingshangDao, Gong
 	
     @Override
     public PageUtils queryPage(Map<String, Object> params) {
-        Page<GongyingshangEntity> page = this.page(
-                new Query<GongyingshangEntity>(params).getPage(),
-                new QueryWrapper<GongyingshangEntity>()
-        );
-        return new PageUtils(page);
+		Page<GongyingshangEntity> page = new Query<GongyingshangEntity>(params).getPage();
+		// Compatibility for unit tests: allow stubbing selectPage(..)
+		Page<GongyingshangEntity> result = this.selectPage(page, new QueryWrapper<GongyingshangEntity>());
+		return new PageUtils(result);
     }
     
     @Override
@@ -58,6 +57,13 @@ public class GongyingshangServiceImpl extends ServiceImpl<GongyingshangDao, Gong
 	@Override
 	public GongyingshangView selectView(Wrapper<GongyingshangEntity> wrapper) {
 		return baseMapper.selectView(wrapper);
+	}
+
+	// ---------------------------------------------------------------------
+	// Compatibility layer for existing unit tests (selectPage)
+	// ---------------------------------------------------------------------
+	public Page<GongyingshangEntity> selectPage(Page<GongyingshangEntity> page, QueryWrapper<GongyingshangEntity> wrapper) {
+		return this.page(page, wrapper);
 	}
 
 

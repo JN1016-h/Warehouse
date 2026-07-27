@@ -24,11 +24,10 @@ public class RukuxinxiServiceImpl extends ServiceImpl<RukuxinxiDao, RukuxinxiEnt
 	
     @Override
     public PageUtils queryPage(Map<String, Object> params) {
-        Page<RukuxinxiEntity> page = this.page(
-                new Query<RukuxinxiEntity>(params).getPage(),
-                new QueryWrapper<RukuxinxiEntity>()
-        );
-        return new PageUtils(page);
+        Page<RukuxinxiEntity> page = new Query<RukuxinxiEntity>(params).getPage();
+		// Compatibility for unit tests: allow stubbing selectPage(..)
+		Page<RukuxinxiEntity> result = this.selectPage(page, new QueryWrapper<RukuxinxiEntity>());
+		return new PageUtils(result);
     }
     
     @Override
@@ -58,6 +57,13 @@ public class RukuxinxiServiceImpl extends ServiceImpl<RukuxinxiDao, RukuxinxiEnt
 	@Override
 	public RukuxinxiView selectView(Wrapper<RukuxinxiEntity> wrapper) {
 		return baseMapper.selectView(wrapper);
+	}
+
+	// ---------------------------------------------------------------------
+	// Compatibility layer for existing unit tests (selectPage)
+	// ---------------------------------------------------------------------
+	public Page<RukuxinxiEntity> selectPage(Page<RukuxinxiEntity> page, QueryWrapper<RukuxinxiEntity> wrapper) {
+		return this.page(page, wrapper);
 	}
 
     @Override

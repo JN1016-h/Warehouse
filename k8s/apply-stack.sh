@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Upload/build on host ù?push Harbor ù?k8s pulls from Harbor
+# Upload/build on host ÔøΩ?push Harbor ÔøΩ?k8s pulls from Harbor
 set -euo pipefail
 
 NS="${K8S_NAMESPACE:-warehouse}"
@@ -15,7 +15,7 @@ FE_IMAGE="${FE_IMAGE:-${HARBOR_HOST}/${HARBOR_PROJECT}/warehouse-frontend:${TAG}
 WAIT="${WAIT_TIMEOUT:-600s}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
 SKIP_PUSH="${SKIP_PUSH:-0}"
-# GitHub CD sets SKIP_MYSQL=1 ù?do not apply/restart MySQL
+# GitHub CD sets SKIP_MYSQL=1 ÔøΩ?do not apply/restart MySQL
 SKIP_MYSQL="${SKIP_MYSQL:-1}"
 
 echo "== ns=${NS} harbor=${HARBOR_HOST}/${HARBOR_PROJECT} tag=${TAG}"
@@ -95,7 +95,7 @@ kubectl -n "${NS}" create secret docker-registry harbor-cred \
   --dry-run=client -o yaml | kubectl apply -f -
 
 if [ "${SKIP_MYSQL}" = "1" ]; then
-  echo "== SKIP_MYSQL=1 ù?leave MySQL deployment/config untouched"
+  echo "== SKIP_MYSQL=1 ÔøΩ?leave MySQL deployment/config untouched"
   if kubectl -n "${NS}" get deploy mysql >/dev/null 2>&1; then
     kubectl -n "${NS}" get deploy,pods -l app=mysql -o wide || true
   else
@@ -153,4 +153,4 @@ echo "== FE    http://${NODE_IP}:30080/"
 curl -fsS --connect-timeout 5 --max-time 20 \
   "http://${NODE_IP}:30081/springboot38hdw40x/config/list?page=1&limit=1" | head -c 200 || true
 echo
-echo "== Harbor ù?k8s deploy done"
+echo "== Harbor ÔøΩ?k8s deploy done"

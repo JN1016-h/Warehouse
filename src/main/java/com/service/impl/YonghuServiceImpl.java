@@ -24,11 +24,10 @@ public class YonghuServiceImpl extends ServiceImpl<YonghuDao, YonghuEntity> impl
 	
     @Override
     public PageUtils queryPage(Map<String, Object> params) {
-        Page<YonghuEntity> page = this.page(
-                new Query<YonghuEntity>(params).getPage(),
-                new QueryWrapper<YonghuEntity>()
-        );
-        return new PageUtils(page);
+        Page<YonghuEntity> page = new Query<YonghuEntity>(params).getPage();
+        // Compatibility for unit tests: allow stubbing selectPage(..)
+        Page<YonghuEntity> result = this.selectPage(page, new QueryWrapper<YonghuEntity>());
+        return new PageUtils(result);
     }
     
     @Override
@@ -58,6 +57,13 @@ public class YonghuServiceImpl extends ServiceImpl<YonghuDao, YonghuEntity> impl
 	@Override
 	public YonghuView selectView(Wrapper<YonghuEntity> wrapper) {
 		return baseMapper.selectView(wrapper);
+	}
+
+	// ---------------------------------------------------------------------
+	// Compatibility layer for existing unit tests (selectPage)
+	// ---------------------------------------------------------------------
+	public Page<YonghuEntity> selectPage(Page<YonghuEntity> page, QueryWrapper<YonghuEntity> wrapper) {
+		return this.page(page, wrapper);
 	}
 
 

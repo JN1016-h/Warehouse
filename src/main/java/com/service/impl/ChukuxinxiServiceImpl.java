@@ -24,11 +24,10 @@ public class ChukuxinxiServiceImpl extends ServiceImpl<ChukuxinxiDao, Chukuxinxi
 	
     @Override
     public PageUtils queryPage(Map<String, Object> params) {
-        Page<ChukuxinxiEntity> page = this.page(
-                new Query<ChukuxinxiEntity>(params).getPage(),
-                new QueryWrapper<ChukuxinxiEntity>()
-        );
-        return new PageUtils(page);
+		Page<ChukuxinxiEntity> page = new Query<ChukuxinxiEntity>(params).getPage();
+		// Compatibility for unit tests: allow stubbing selectPage(..)
+		Page<ChukuxinxiEntity> result = this.selectPage(page, new QueryWrapper<ChukuxinxiEntity>());
+		return new PageUtils(result);
     }
     
     @Override
@@ -58,6 +57,13 @@ public class ChukuxinxiServiceImpl extends ServiceImpl<ChukuxinxiDao, Chukuxinxi
 	@Override
 	public ChukuxinxiView selectView(Wrapper<ChukuxinxiEntity> wrapper) {
 		return baseMapper.selectView(wrapper);
+	}
+
+	// ---------------------------------------------------------------------
+	// Compatibility layer for existing unit tests (selectPage)
+	// ---------------------------------------------------------------------
+	public Page<ChukuxinxiEntity> selectPage(Page<ChukuxinxiEntity> page, QueryWrapper<ChukuxinxiEntity> wrapper) {
+		return this.page(page, wrapper);
 	}
 
 

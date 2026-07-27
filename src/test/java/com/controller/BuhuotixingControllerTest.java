@@ -106,16 +106,16 @@ public class BuhuotixingControllerTest {
 
     @Test
     public void testRemindCountType1() {
-        when(buhuotixingService.count(any())).thenReturn(3);
+        when(buhuotixingService.count(any())).thenReturn(3L);
         Map<String, Object> map = new HashMap<String, Object>();
         R result = controller.remindCount("addtime", ControllerTestSupport.mockAdminRequest(), "1", map);
         assertEquals(0, result.get("code"));
-        assertEquals(3, result.get("count"));
+        assertEquals(3L, result.get("count"));
     }
 
     @Test
     public void testRemindCountType2() {
-        when(buhuotixingService.count(any())).thenReturn(2);
+        when(buhuotixingService.count(any())).thenReturn(2L);
         Map<String, Object> map = new HashMap<String, Object>();
         map.put("remindstart", "1");
         map.put("remindend", "7");
@@ -137,7 +137,7 @@ public class BuhuotixingControllerTest {
 
     @Test
     public void testCount() {
-        when(buhuotixingService.count(any())).thenReturn(5);
+        when(buhuotixingService.count(any())).thenReturn(5L);
         R result = controller.count(ControllerTestSupport.pageParams(), new BuhuotixingEntity());
         assertEquals(0, result.get("code"));
     }
@@ -186,7 +186,7 @@ public class BuhuotixingControllerTest {
 
     @Test
     public void testRemindCountType2EmptyMap() {
-        when(buhuotixingService.count(any())).thenReturn(1);
+        when(buhuotixingService.count(any())).thenReturn(1L);
         R result = controller.remindCount("addtime", ControllerTestSupport.mockAdminRequest(), "2",
                 new HashMap<String, Object>());
         assertEquals(0, result.get("code"));
@@ -210,7 +210,7 @@ public class BuhuotixingControllerTest {
 
     @Test
     public void testRemindCountType2OnlyStart() {
-        when(buhuotixingService.count(any())).thenReturn(2);
+        when(buhuotixingService.count(any())).thenReturn(2L);
         Map<String, Object> map = new HashMap<String, Object>();
         map.put("remindstart", "3");
         R result = controller.remindCount("addtime", ControllerTestSupport.mockAdminRequest(), "2", map);
@@ -219,7 +219,7 @@ public class BuhuotixingControllerTest {
 
     @Test
     public void testRemindCountType2OnlyEnd() {
-        when(buhuotixingService.count(any())).thenReturn(1);
+        when(buhuotixingService.count(any())).thenReturn(1L);
         Map<String, Object> map = new HashMap<String, Object>();
         map.put("remindend", "7");
         R result = controller.remindCount("addtime", ControllerTestSupport.mockAdminRequest(), "2", map);
@@ -240,7 +240,7 @@ public class BuhuotixingControllerTest {
 
     @Test
     public void testRemindCountType1WithRange() {
-        when(buhuotixingService.count(any())).thenReturn(4);
+        when(buhuotixingService.count(any())).thenReturn(4L);
         Map<String, Object> map = new HashMap<String, Object>();
         map.put("remindstart", "2025-01-01");
         map.put("remindend", "2025-12-31");

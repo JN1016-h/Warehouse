@@ -48,7 +48,7 @@ public class ChatHistoryServiceTest {
 
         assertSame(existing, result);
         verify(sessionDao).updateById(existing);
-        verify(sessionDao, never()).insert(any());
+        verify(sessionDao, never()).insert(any(AiChatSessionEntity.class));
     }
 
     @Test

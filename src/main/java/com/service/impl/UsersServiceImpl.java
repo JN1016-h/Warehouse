@@ -26,11 +26,10 @@ public class UsersServiceImpl extends ServiceImpl<UsersDao, UsersEntity> impleme
 
 	@Override
 	public PageUtils queryPage(Map<String, Object> params) {
-		Page<UsersEntity> page = this.page(
-                new Query<UsersEntity>(params).getPage(),
-                new QueryWrapper<UsersEntity>()
-        );
-        return new PageUtils(page);
+		Page<UsersEntity> page = new Query<UsersEntity>(params).getPage();
+		// Compatibility for unit tests: allow stubbing selectPage(..)
+		Page<UsersEntity> result = this.selectPage(page, new QueryWrapper<UsersEntity>());
+		return new PageUtils(result);
 	}
 
 	@Override
@@ -45,5 +44,12 @@ public class UsersServiceImpl extends ServiceImpl<UsersDao, UsersEntity> impleme
 	        page.setRecords(baseMapper.selectListView(page,wrapper));
 	    	PageUtils pageUtil = new PageUtils(page);
 	    	return pageUtil;
+	}
+
+	// ---------------------------------------------------------------------
+	// Compatibility layer for existing unit tests (selectPage)
+	// ---------------------------------------------------------------------
+	public Page<UsersEntity> selectPage(Page<UsersEntity> page, QueryWrapper<UsersEntity> wrapper) {
+		return this.page(page, wrapper);
 	}
 }

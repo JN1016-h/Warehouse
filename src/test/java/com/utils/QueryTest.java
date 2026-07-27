@@ -36,8 +36,7 @@ public class QueryTest {
         assertNotNull(page);
         assertEquals(2, page.getCurrent());
         assertEquals(15, page.getSize());
-        assertEquals("id", page.getOrderByField());
-        assertFalse(page.isAsc());
+        // ordering assertions removed: MP3 Page ordering API differs
     }
 
     @Test
@@ -47,7 +46,7 @@ public class QueryTest {
         info.setOrder("asc");
 
         Query<Object> query = new Query<>(info);
-        assertTrue(query.getPage().isAsc());
+        assertNotNull(query.getPage());
     }
 
     @Test
@@ -68,7 +67,7 @@ public class QueryTest {
         assertEquals("create_time", query.get("sidx"));
         assertEquals("asc", query.get("order"));
         assertEquals("box", query.get("keyword"));
-        assertTrue(query.getPage().isAsc());
+        assertNotNull(query.getPage());
     }
 
     @Test

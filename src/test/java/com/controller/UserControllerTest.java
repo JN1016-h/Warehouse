@@ -261,7 +261,7 @@ public class UserControllerTest {
         YonghuEntity yonghu = new YonghuEntity();
         yonghu.setYonghuzhanghao("saveuser");
         yonghu.setMima("pass123");
-        when(yonghuService.count(any())).thenReturn(0);
+        when(yonghuService.count(any())).thenReturn(0L);
         when(yonghuService.getOne(any())).thenReturn(null);
 
         R result = yonghuController.save(yonghu, ControllerTestSupport.mockAdminRequest());
@@ -273,7 +273,7 @@ public class UserControllerTest {
         YonghuEntity yonghu = new YonghuEntity();
         yonghu.setYonghuzhanghao("adduser");
         yonghu.setMima("pass123");
-        when(yonghuService.count(any())).thenReturn(0);
+        when(yonghuService.count(any())).thenReturn(0L);
         when(yonghuService.getOne(any())).thenReturn(null);
 
         R result = yonghuController.add(yonghu, ControllerTestSupport.mockAdminRequest());
@@ -285,7 +285,7 @@ public class UserControllerTest {
         YonghuEntity yonghu = new YonghuEntity();
         yonghu.setId(1L);
         yonghu.setYonghuzhanghao("updateuser");
-        when(yonghuService.count(any())).thenReturn(0);
+        when(yonghuService.count(any())).thenReturn(0L);
 
         R result = yonghuController.update(yonghu, ControllerTestSupport.mockAdminRequest());
         assertEquals(0, result.get("code"));
@@ -415,7 +415,7 @@ public class UserControllerTest {
     public void testSaveDuplicateByCount() {
         YonghuEntity yonghu = new YonghuEntity();
         yonghu.setYonghuzhanghao("dup");
-        when(yonghuService.count(any())).thenReturn(1);
+        when(yonghuService.count(any())).thenReturn(1L);
 
         R result = yonghuController.save(yonghu, ControllerTestSupport.mockAdminRequest());
         assertEquals(500, result.get("code"));
@@ -425,7 +425,7 @@ public class UserControllerTest {
     public void testSaveDuplicateBySelectOne() {
         YonghuEntity yonghu = new YonghuEntity();
         yonghu.setYonghuzhanghao("dup2");
-        when(yonghuService.count(any())).thenReturn(0);
+        when(yonghuService.count(any())).thenReturn(0L);
         when(yonghuService.getOne(any())).thenReturn(new YonghuEntity());
 
         R result = yonghuController.save(yonghu, ControllerTestSupport.mockAdminRequest());
@@ -437,7 +437,7 @@ public class UserControllerTest {
         YonghuEntity yonghu = new YonghuEntity();
         yonghu.setYonghuzhanghao("nopass");
         yonghu.setMima("  ");
-        when(yonghuService.count(any())).thenReturn(0);
+        when(yonghuService.count(any())).thenReturn(0L);
         when(yonghuService.getOne(any())).thenReturn(null);
 
         R result = yonghuController.save(yonghu, ControllerTestSupport.mockAdminRequest());
@@ -448,7 +448,7 @@ public class UserControllerTest {
     public void testAddDuplicate() {
         YonghuEntity yonghu = new YonghuEntity();
         yonghu.setYonghuzhanghao("adddup");
-        when(yonghuService.count(any())).thenReturn(1);
+        when(yonghuService.count(any())).thenReturn(1L);
 
         R result = yonghuController.add(yonghu, ControllerTestSupport.mockAdminRequest());
         assertEquals(500, result.get("code"));
@@ -459,7 +459,7 @@ public class UserControllerTest {
         YonghuEntity yonghu = new YonghuEntity();
         yonghu.setId(1L);
         yonghu.setYonghuzhanghao("taken");
-        when(yonghuService.count(any())).thenReturn(1);
+        when(yonghuService.count(any())).thenReturn(1L);
 
         R result = yonghuController.update(yonghu, ControllerTestSupport.mockAdminRequest());
         assertEquals(500, result.get("code"));
@@ -470,7 +470,7 @@ public class UserControllerTest {
         YonghuEntity yonghu = new YonghuEntity();
         yonghu.setId(1L);
         yonghu.setYonghuzhanghao(null);
-        when(yonghuService.count(any())).thenReturn(0);
+        when(yonghuService.count(any())).thenReturn(0L);
 
         R result = yonghuController.update(yonghu, ControllerTestSupport.mockAdminRequest());
         assertEquals(0, result.get("code"));
@@ -513,7 +513,7 @@ public class UserControllerTest {
     public void testAddDuplicateBySelectOne() {
         YonghuEntity yonghu = new YonghuEntity();
         yonghu.setYonghuzhanghao("adddup2");
-        when(yonghuService.count(any())).thenReturn(0);
+        when(yonghuService.count(any())).thenReturn(0L);
         when(yonghuService.getOne(any())).thenReturn(new YonghuEntity());
 
         R result = yonghuController.add(yonghu, ControllerTestSupport.mockAdminRequest());
@@ -525,7 +525,7 @@ public class UserControllerTest {
         YonghuEntity yonghu = new YonghuEntity();
         yonghu.setId(1L);
         yonghu.setYonghuzhanghao("renamed");
-        when(yonghuService.count(any())).thenReturn(0);
+        when(yonghuService.count(any())).thenReturn(0L);
 
         R result = yonghuController.update(yonghu, ControllerTestSupport.mockAdminRequest());
         assertEquals(0, result.get("code"));
@@ -548,7 +548,7 @@ public class UserControllerTest {
         YonghuEntity yonghu = new YonghuEntity();
         yonghu.setYonghuzhanghao("nopass");
         yonghu.setMima("  ");
-        when(yonghuService.count(any())).thenReturn(0);
+        when(yonghuService.count(any())).thenReturn(0L);
         when(yonghuService.getOne(any())).thenReturn(null);
 
         R result = yonghuController.add(yonghu, ControllerTestSupport.mockAdminRequest());

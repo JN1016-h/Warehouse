@@ -156,7 +156,7 @@ public class DinghuoxinxiControllerTest {
 
     @Test
     public void testCount() {
-        when(dinghuoxinxiService.count(any())).thenReturn(3);
+        when(dinghuoxinxiService.count(any())).thenReturn(3L);
         R result = controller.count(ControllerTestSupport.pageParams(), new DinghuoxinxiEntity(),
                 ControllerTestSupport.mockAdminRequest());
         assertEquals(0, result.get("code"));
@@ -233,7 +233,7 @@ public class DinghuoxinxiControllerTest {
 
     @Test
     public void testCountAsYonghu() {
-        when(dinghuoxinxiService.count(any())).thenReturn(5);
+        when(dinghuoxinxiService.count(any())).thenReturn(5L);
         R result = controller.count(ControllerTestSupport.pageParams(), new DinghuoxinxiEntity(),
                 ControllerTestSupport.mockRequestWithSession("yonghu", "user1", 1L, null));
         assertEquals(0, result.get("code"));

@@ -52,7 +52,8 @@ public class TokenServiceImpl extends ServiceImpl<TokenDao, TokenEntity> impleme
 
 	@Override
 	public String generateToken(Long userid,String username, String tableName, String role) {
-		TokenEntity tokenEntity = this.getOne(new QueryWrapper<TokenEntity>().eq("userid", userid).eq("role", role));
+		// Compatibility with legacy unit tests (selectOne/insert)
+		TokenEntity tokenEntity = this.selectOne(new QueryWrapper<TokenEntity>().eq("userid", userid).eq("role", role));
 		String token = CommonUtil.getRandomString(32);
 		Calendar cal = Calendar.getInstance();   
     	cal.setTime(new Date());   
@@ -62,18 +63,29 @@ public class TokenServiceImpl extends ServiceImpl<TokenDao, TokenEntity> impleme
 			tokenEntity.setExpiratedtime(cal.getTime());
 			this.updateById(tokenEntity);
 		} else {
-			this.save(new TokenEntity(userid,username, tableName, role, token, cal.getTime()));
+			this.insert(new TokenEntity(userid,username, tableName, role, token, cal.getTime()));
 		}
 		return token;
 	}
 
 	@Override
 	public TokenEntity getTokenEntity(String token) {
-		TokenEntity tokenEntity = this.getOne(new QueryWrapper<TokenEntity>().eq("token", token));
+		TokenEntity tokenEntity = this.selectOne(new QueryWrapper<TokenEntity>().eq("token", token));
 		if (tokenEntity == null || tokenEntity.getExpiratedtime() == null
 				|| tokenEntity.getExpiratedtime().getTime() < new Date().getTime()) {
 			return null;
 		}
 		return tokenEntity;
+	}
+
+	// ---------------------------------------------------------------------
+	// Compatibility layer for existing unit tests (MP2 -> MP3)
+	// ---------------------------------------------------------------------
+	public TokenEntity selectOne(QueryWrapper<TokenEntity> wrapper) {
+		return this.getOne(wrapper);
+	}
+
+	public boolean insert(TokenEntity entity) {
+		return this.save(entity);
 	}
 }

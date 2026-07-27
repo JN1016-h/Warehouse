@@ -24,11 +24,10 @@ public class ShangpinxinxiServiceImpl extends ServiceImpl<ShangpinxinxiDao, Shan
 	
     @Override
     public PageUtils queryPage(Map<String, Object> params) {
-        Page<ShangpinxinxiEntity> page = this.page(
-                new Query<ShangpinxinxiEntity>(params).getPage(),
-                new QueryWrapper<ShangpinxinxiEntity>()
-        );
-        return new PageUtils(page);
+		Page<ShangpinxinxiEntity> page = new Query<ShangpinxinxiEntity>(params).getPage();
+		// Compatibility for unit tests: allow stubbing selectPage(..)
+		Page<ShangpinxinxiEntity> result = this.selectPage(page, new QueryWrapper<ShangpinxinxiEntity>());
+		return new PageUtils(result);
     }
     
     @Override
@@ -74,6 +73,13 @@ public class ShangpinxinxiServiceImpl extends ServiceImpl<ShangpinxinxiDao, Shan
     public List<Map<String, Object>> selectGroup(Map<String, Object> params, Wrapper<ShangpinxinxiEntity> wrapper) {
         return baseMapper.selectGroup(params, wrapper);
     }
+
+	// ---------------------------------------------------------------------
+	// Compatibility layer for existing unit tests (selectPage)
+	// ---------------------------------------------------------------------
+	public Page<ShangpinxinxiEntity> selectPage(Page<ShangpinxinxiEntity> page, QueryWrapper<ShangpinxinxiEntity> wrapper) {
+		return this.page(page, wrapper);
+	}
 
 
 

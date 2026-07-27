@@ -155,7 +155,7 @@ public class ShangpinxinxiControllerTest {
 
     @Test
     public void testCount() {
-        when(shangpinxinxiService.count(any())).thenReturn(12);
+        when(shangpinxinxiService.count(any())).thenReturn(12L);
         R result = controller.count(ControllerTestSupport.pageParams(), new ShangpinxinxiEntity(),
                 ControllerTestSupport.mockAdminRequest());
         assertEquals(0, result.get("code"));

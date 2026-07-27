@@ -105,7 +105,8 @@ public class BuhuotixingServiceImpl extends ServiceImpl<BuhuotixingDao, Buhuotix
         alertWrapper.eq("fuzhuangbianhao", fuzhuangbianhao);
         alertWrapper.eq("chuangjianren", yonghuzhanghao);
         alertWrapper.eq("tixingzhuangtai", "待处理");
-        long count = this.count(alertWrapper);
+        // Compatibility with legacy unit tests: use selectCount(..)
+        int count = this.selectCount(alertWrapper);
         
         if (count > 0) {
             return; // 已存在该用户的待处理提醒，不重复创建
@@ -123,12 +124,14 @@ public class BuhuotixingServiceImpl extends ServiceImpl<BuhuotixingDao, Buhuotix
         alert.setTixingzhuangtai("待处理");
         alert.setChuangjianren(yonghuzhanghao); // 设置为用户账号
         
-        this.save(alert);
+        // Compatibility with legacy unit tests: use insert(..)
+        this.insert(alert);
     }
     
     @Override
     public void completeAlert(Long id) {
-        BuhuotixingEntity alert = this.getById(id);
+        // Compatibility with legacy unit tests: use selectById(..)
+        BuhuotixingEntity alert = (id == null) ? null : this.selectById(id.longValue());
         if (alert != null) {
             alert.setTixingzhuangtai("已完成");
             alert.setWanchengshijian(new Date());
@@ -138,11 +141,31 @@ public class BuhuotixingServiceImpl extends ServiceImpl<BuhuotixingDao, Buhuotix
     
     @Override
     public void cancelAlert(Long id) {
-        BuhuotixingEntity alert = this.getById(id);
+        // Compatibility with legacy unit tests: use selectById(..)
+        BuhuotixingEntity alert = (id == null) ? null : this.selectById(id.longValue());
         if (alert != null) {
             alert.setTixingzhuangtai("已取消");
             this.updateById(alert);
         }
+    }
+
+    // ---------------------------------------------------------------------
+    // Compatibility layer for existing unit tests (MP2 -> MP3)
+    // ---------------------------------------------------------------------
+    public boolean insert(BuhuotixingEntity entity) {
+        return this.save(entity);
+    }
+
+    public int selectCount(QueryWrapper<BuhuotixingEntity> wrapper) {
+        return (int) this.count(wrapper);
+    }
+
+    public BuhuotixingEntity selectById(Long id) {
+        return id == null ? null : this.getById(id);
+    }
+
+    public BuhuotixingEntity selectById(long id) {
+        return this.getById(id);
     }
 
 }

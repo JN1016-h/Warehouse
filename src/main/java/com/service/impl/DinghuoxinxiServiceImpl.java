@@ -24,11 +24,10 @@ public class DinghuoxinxiServiceImpl extends ServiceImpl<DinghuoxinxiDao, Dinghu
 	
     @Override
     public PageUtils queryPage(Map<String, Object> params) {
-        Page<DinghuoxinxiEntity> page = this.page(
-                new Query<DinghuoxinxiEntity>(params).getPage(),
-                new QueryWrapper<DinghuoxinxiEntity>()
-        );
-        return new PageUtils(page);
+        Page<DinghuoxinxiEntity> page = new Query<DinghuoxinxiEntity>(params).getPage();
+		// Compatibility for unit tests: allow stubbing selectPage(..)
+		Page<DinghuoxinxiEntity> result = this.selectPage(page, new QueryWrapper<DinghuoxinxiEntity>());
+		return new PageUtils(result);
     }
     
     @Override
@@ -58,6 +57,14 @@ public class DinghuoxinxiServiceImpl extends ServiceImpl<DinghuoxinxiDao, Dinghu
 	@Override
 	public DinghuoxinxiView selectView(Wrapper<DinghuoxinxiEntity> wrapper) {
 		return baseMapper.selectView(wrapper);
+	}
+
+	// ---------------------------------------------------------------------
+	// Compatibility layer for existing unit tests (selectPage)
+	// ---------------------------------------------------------------------
+	public Page<DinghuoxinxiEntity> selectPage(Page<DinghuoxinxiEntity> page,
+			QueryWrapper<DinghuoxinxiEntity> wrapper) {
+		return this.page(page, wrapper);
 	}
 
     @Override

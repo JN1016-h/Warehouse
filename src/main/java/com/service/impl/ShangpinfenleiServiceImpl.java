@@ -24,11 +24,10 @@ public class ShangpinfenleiServiceImpl extends ServiceImpl<ShangpinfenleiDao, Sh
 	
     @Override
     public PageUtils queryPage(Map<String, Object> params) {
-        Page<ShangpinfenleiEntity> page = this.page(
-                new Query<ShangpinfenleiEntity>(params).getPage(),
-                new QueryWrapper<ShangpinfenleiEntity>()
-        );
-        return new PageUtils(page);
+        Page<ShangpinfenleiEntity> page = new Query<ShangpinfenleiEntity>(params).getPage();
+		// Compatibility for unit tests: allow stubbing selectPage(..)
+		Page<ShangpinfenleiEntity> result = this.selectPage(page, new QueryWrapper<ShangpinfenleiEntity>());
+		return new PageUtils(result);
     }
     
     @Override
@@ -58,6 +57,14 @@ public class ShangpinfenleiServiceImpl extends ServiceImpl<ShangpinfenleiDao, Sh
 	@Override
 	public ShangpinfenleiView selectView(Wrapper<ShangpinfenleiEntity> wrapper) {
 		return baseMapper.selectView(wrapper);
+	}
+
+	// ---------------------------------------------------------------------
+	// Compatibility layer for existing unit tests (selectPage)
+	// ---------------------------------------------------------------------
+	public Page<ShangpinfenleiEntity> selectPage(Page<ShangpinfenleiEntity> page,
+			QueryWrapper<ShangpinfenleiEntity> wrapper) {
+		return this.page(page, wrapper);
 	}
 
 

@@ -71,8 +71,11 @@ public class FinanceServiceTest {
         entity.setJiaohuoshijian(new Date());
         chukuxinxiList.add(entity);
         
-        // 模拟DAO行为
-        when(chukuxinxiDao.selectPage(any(), any())).thenReturn(chukuxinxiList);
+        // 模拟DAO行为（selectPage 返回 IPage，不是 List）
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<ChukuxinxiEntity> pageResult =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(query.getPage(), query.getLimit());
+        pageResult.setRecords(chukuxinxiList);
+        when(chukuxinxiDao.selectPage(any(), any())).thenReturn(pageResult);
         
         // 执行测试
         PageUtils result = financeService.queryReceivables(query);
@@ -105,8 +108,11 @@ public class FinanceServiceTest {
         entity.setRukushijian(new Date());
         rukuxinxiList.add(entity);
         
-        // 模拟DAO行为
-        when(rukuxinxiDao.selectPage(any(), any())).thenReturn(rukuxinxiList);
+        // 模拟DAO行为（selectPage 返回 IPage，不是 List）
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<RukuxinxiEntity> pageResult =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(query.getPage(), query.getLimit());
+        pageResult.setRecords(rukuxinxiList);
+        when(rukuxinxiDao.selectPage(any(), any())).thenReturn(pageResult);
         
         // 执行测试
         PageUtils result = financeService.queryPayables(query);
@@ -229,7 +235,7 @@ public class FinanceServiceTest {
         
         // 验证方法调用
         verify(chukuxinxiDao, times(1)).selectById(orderId);
-        verify(chukuxinxiDao, never()).updateById(any());
+        verify(chukuxinxiDao, never()).updateById(any(ChukuxinxiEntity.class));
     }
     
     /**
@@ -382,7 +388,10 @@ public class FinanceServiceTest {
         entity.setPaymentStatus("PAID");
         entity.setJiaohuoshijian(new Date());
 
-        when(chukuxinxiDao.selectPage(any(), any())).thenReturn(Collections.singletonList(entity));
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<ChukuxinxiEntity> pageResult =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(query.getPage(), query.getLimit());
+        pageResult.setRecords(Collections.singletonList(entity));
+        when(chukuxinxiDao.selectPage(any(), any())).thenReturn(pageResult);
         when(dinghuoxinxiDao.selectList(any())).thenReturn(Collections.emptyList());
 
         PageUtils result = financeService.queryReceivables(query);
@@ -407,7 +416,10 @@ public class FinanceServiceTest {
         entity.setPaymentStatus("UNPAID");
         entity.setRukushijian(new Date());
 
-        when(rukuxinxiDao.selectPage(any(), any())).thenReturn(Collections.singletonList(entity));
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<RukuxinxiEntity> pageResult =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(query.getPage(), query.getLimit());
+        pageResult.setRecords(Collections.singletonList(entity));
+        when(rukuxinxiDao.selectPage(any(), any())).thenReturn(pageResult);
         when(dinghuoxinxiDao.selectById(any())).thenReturn(null);
         when(dinghuoxinxiDao.selectList(any())).thenReturn(Collections.emptyList());
 
@@ -526,7 +538,10 @@ public class FinanceServiceTest {
         entity.setFuzhuangbianhao("CK001");
         entity.setPaymentStatus("INVALID_STATUS");
 
-        when(chukuxinxiDao.selectPage(any(), any())).thenReturn(Collections.singletonList(entity));
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<ChukuxinxiEntity> pageResult =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(query.getPage(), query.getLimit());
+        pageResult.setRecords(Collections.singletonList(entity));
+        when(chukuxinxiDao.selectPage(any(), any())).thenReturn(pageResult);
         when(dinghuoxinxiDao.selectList(any())).thenReturn(Collections.emptyList());
 
         PageUtils result = financeService.queryReceivables(query);
@@ -543,7 +558,10 @@ public class FinanceServiceTest {
         entity.setId(1L);
         entity.setPaymentStatus(null);
 
-        when(chukuxinxiDao.selectPage(any(), any())).thenReturn(Collections.singletonList(entity));
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<ChukuxinxiEntity> pageResult =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(query.getPage(), query.getLimit());
+        pageResult.setRecords(Collections.singletonList(entity));
+        when(chukuxinxiDao.selectPage(any(), any())).thenReturn(pageResult);
         when(dinghuoxinxiDao.selectList(any())).thenReturn(Collections.emptyList());
 
         PageUtils result = financeService.queryReceivables(query);
@@ -553,7 +571,10 @@ public class FinanceServiceTest {
     @Test
     public void testQueryReceivables_NullPageLimit() {
         ReceivableQuery query = new ReceivableQuery();
-        when(chukuxinxiDao.selectPage(any(), any())).thenReturn(Collections.emptyList());
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<ChukuxinxiEntity> pageResult =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(1, 10);
+        pageResult.setRecords(Collections.emptyList());
+        when(chukuxinxiDao.selectPage(any(), any())).thenReturn(pageResult);
         PageUtils result = financeService.queryReceivables(query);
         assertNotNull(result);
     }
@@ -561,7 +582,10 @@ public class FinanceServiceTest {
     @Test
     public void testQueryPayables_NullPageLimit() {
         PayableQuery query = new PayableQuery();
-        when(rukuxinxiDao.selectPage(any(), any())).thenReturn(Collections.emptyList());
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<RukuxinxiEntity> pageResult =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(1, 10);
+        pageResult.setRecords(Collections.emptyList());
+        when(rukuxinxiDao.selectPage(any(), any())).thenReturn(pageResult);
         PageUtils result = financeService.queryPayables(query);
         assertNotNull(result);
     }
@@ -652,7 +676,10 @@ public class FinanceServiceTest {
         entity.setId(1L);
         entity.setPaymentStatus("BAD");
 
-        when(rukuxinxiDao.selectPage(any(), any())).thenReturn(Collections.singletonList(entity));
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<RukuxinxiEntity> pageResult =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(query.getPage(), query.getLimit());
+        pageResult.setRecords(Collections.singletonList(entity));
+        when(rukuxinxiDao.selectPage(any(), any())).thenReturn(pageResult);
         when(dinghuoxinxiDao.selectById(any())).thenReturn(null);
         when(dinghuoxinxiDao.selectList(any())).thenReturn(Collections.emptyList());
 
@@ -666,7 +693,10 @@ public class FinanceServiceTest {
         RukuxinxiEntity entity = new RukuxinxiEntity();
         entity.setPaymentStatus(null);
 
-        when(rukuxinxiDao.selectPage(any(), any())).thenReturn(Collections.singletonList(entity));
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<RukuxinxiEntity> pageResult =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(1, 10);
+        pageResult.setRecords(Collections.singletonList(entity));
+        when(rukuxinxiDao.selectPage(any(), any())).thenReturn(pageResult);
         when(dinghuoxinxiDao.selectList(any())).thenReturn(Collections.emptyList());
 
         PageUtils result = financeService.queryPayables(query);
@@ -701,7 +731,10 @@ public class FinanceServiceTest {
     public void testQueryReceivables_EmptyCustomerNameSkipped() {
         ReceivableQuery query = new ReceivableQuery();
         query.setCustomerName("   ");
-        when(chukuxinxiDao.selectPage(any(), any())).thenReturn(Collections.emptyList());
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<ChukuxinxiEntity> pageResult =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(1, 10);
+        pageResult.setRecords(Collections.emptyList());
+        when(chukuxinxiDao.selectPage(any(), any())).thenReturn(pageResult);
         PageUtils result = financeService.queryReceivables(query);
         assertNotNull(result);
     }
@@ -710,7 +743,10 @@ public class FinanceServiceTest {
     public void testQueryPayables_EmptySupplierNameSkipped() {
         PayableQuery query = new PayableQuery();
         query.setSupplierName("  ");
-        when(rukuxinxiDao.selectPage(any(), any())).thenReturn(Collections.emptyList());
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<RukuxinxiEntity> pageResult =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(1, 10);
+        pageResult.setRecords(Collections.emptyList());
+        when(rukuxinxiDao.selectPage(any(), any())).thenReturn(pageResult);
         PageUtils result = financeService.queryPayables(query);
         assertNotNull(result);
     }
