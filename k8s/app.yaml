@@ -19,6 +19,12 @@ data:
   SPRING_DATASOURCE_DRIVER_CLASS_NAME: "com.mysql.cj.jdbc.Driver"
   SERVER_PORT: "8080"
   SERVER_SERVLET_CONTEXT_PATH: "/springboot38hdw40x"
+  # AI (non-secret); api key lives in Secret
+  AI_ENABLED: "true"
+  AI_PROVIDER: "openai-compatible"
+  AI_BASE_URL: "https://ai.imge.cc.cd/v1"
+  AI_MODEL: "qwen/qwen3.5-35b-a3b"
+  AI_TIMEOUT_MS: "90000"
 ---
 apiVersion: v1
 kind: Secret
@@ -28,6 +34,12 @@ metadata:
 type: Opaque
 stringData:
   SPRING_DATASOURCE_PASSWORD: "123123"
+  # Required for online LLM; empty → UI shows local-stats fallback
+  AI_API_KEY: "sk-0305a2be4edc60f5dedc92194de47d1d92eb83289488bba75351fd44391b6425"
+  # EncryptUtil (optional but recommended after Sonar crypto hardening)
+  WAREHOUSE_DES_KEY: "12345678"
+  WAREHOUSE_AES_KEY: "1234567890123456"
+  WAREHOUSE_AES_IV: "abcdefghijklmnop"
 ---
 apiVersion: apps/v1
 kind: Deployment
